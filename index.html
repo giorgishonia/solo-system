@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Solo Leveling</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <link rel="stylesheet" href="src/style.css" />
+  </head>
+  <body>
+    <div id="interface">
+      <div class="header">
+        <div class="status">
+          <div class="status-indicator">
+            <div class="status-dot active" id="systemStatus"></div>
+            <div class="status-label">SYSTEM ACTIVE</div>
+          </div>
+          <div class="status-indicator">
+            <div class="status-dot inactive" id="listeningStatus"></div>
+            <div class="status-label">VOICE INPUT</div>
+          </div>
+          <div class="status-indicator">
+            <div class="status-dot inactive" id="processingStatus"></div>
+            <div class="status-label">PROCESSING</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div class="interaction-area">
+          <div id="responseBubble" class="speech-bubble typewriter"></div>
+          <div class="transcript-container">
+            <div class="transcript" id="transcript"></div>
+          </div>
+          <div class="controls">
+            <button class="control-btn" id="startListening">
+              <i class="fas fa-microphone"></i> Start Listening
+            </button>
+            <button class="control-btn" id="stopListening" style="display: none;">
+              <i class="fas fa-microphone-slash"></i> Stop Listening
+            </button>
+          </div>
+          <div class="listening-indicator" id="listeningIndicator">
+            Listening for your command...
+          </div>
+          <div class="thinking-indicator" id="thinkingIndicator">
+            <span>Thinking</span>
+            <div class="thinking-dots">
+              <div class="thinking-dot"></div>
+              <div class="thinking-dot"></div>
+              <div class="thinking-dot"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>   
+    <!-- Update terminal HTML structure -->
+    <div class="terminal-container" id="terminal">
+      <div class="terminal-output" id="output"></div>
+      <div class="input-container">
+        <span class="terminal-prompt">
+          <span id="terminal-prompt-user" class="terminal-prompt-user">PLAYER</span>
+          <span class="terminal-prompt-separator">:</span>
+        </span>
+        <input
+          autocomplete="off"
+          type="text"
+          class="terminal-input"
+          id="input"
+          autofocus
+        />
+      </div>
+    </div>
+
+    <div style="z-index: 100000" class="notification" id="notification">
+      <div class="notification-content"></div>
+    </div>
+
+    <div class="status-bar">
+      <span>RANK: E</span>
+      <span>LEVEL: 1</span>
+      <span>EXP: 0/159</span>
+      <span>GOLD: 0</span>
+    </div>
+
+    <!-- Notifications Window -->
+    <div id="notificationsWindow" class="window">
+      <div class="window-header">
+        <div class="window-title">Notifications</div>
+        <button class="window-close">×</button>
+      </div>
+      <div class="window-content">
+        <div id="notificationsList" class="notifications-list"></div>
+      </div>
+    </div>
+
+    <!-- Window Overlay -->
+    <div class="window-overlay" id="windowOverlay"></div>
+
+    <!-- Profile Window -->
+    <div class="window" id="profileWindow">
+      <div class="window-header">
+        <div class="window-title">Profile & Status</div>
+        <div class="window-controls">
+          <button class="window-minimize">-</button>
+          <button class="window-close">×</button>
+        </div>
+      </div>
+      <div class="window-content">
+        <div class="window-section">
+          <div class="window-section-title">Character Info</div>
+          <div class="window-grid">
+            <div class="window-item">
+              <div class="window-item-title">Name</div>
+              <div class="window-item-description" id="profileName">
+                Not set
+              </div>
+            </div>
+            <div class="window-item">
+              <div class="window-item-title">Title</div>
+              <div class="window-item-description" id="profileTitle">
+                Not set
+              </div>
+            </div>
+            <div class="window-item">
+              <div class="window-item-title">Class</div>
+              <div class="window-item-description" id="profileClass">
+                Not set
+              </div>
+            </div>
+            <div class="window-item">
+              <div class="window-item-title">Bio</div>
+              <div class="window-item-description" id="profileBio">Not set</div>
+            </div>
+          </div>
+        </div>
+        <div class="window-section">
+          <div class="window-section-title">Stats</div>
+          <div class="window-grid">
+            <div class="window-item">
+              <div class="window-item-title">Rank</div>
+              <div class="window-item-description" id="profileRank">E</div>
+            </div>
+            <div class="window-item">
+              <div class="window-item-title">Level</div>
+              <div class="window-item-description" id="profileLevel">1</div>
+            </div>
+            <div class="window-item">
+              <div class="window-item-title">Experience</div>
+              <div class="window-item-description" id="profileExp">0/100</div>
+              <div class="window-item-progress">
+                <div
+                  class="window-item-progress-bar"
+                  id="profileExpBar"
+                  style="width: 0%"
+                ></div>
+              </div>
+            </div>
+            <div class="window-item">
+              <div class="window-item-title">Gold</div>
+              <div class="window-item-description" id="profileGold">0</div>
+            </div>
+          </div>
+        </div>
+        <div class="window-section">
+          <div class="window-section-title">Progress</div>
+          <div class="window-grid">
+            <div class="window-item">
+              <div class="window-item-title">Quests Completed</div>
+              <div class="window-item-description" id="profileQuestsCompleted">
+                0
+              </div>
+            </div>
+            <div class="window-item">
+              <div class="window-item-title">Daily Streak</div>
+              <div class="window-item-description" id="profileStreak">
+                0 days
+              </div>
+            </div>
+            <div class="window-item">
+              <div class="window-item-title">Water Intake</div>
+              <div class="window-item-description" id="profileWaterIntake">
+                0/8 glasses
+              </div>
+              <div class="window-item-progress">
+                <div
+                  class="window-item-progress-bar"
+                  id="profileWaterBar"
+                  style="width: 0%"
+                ></div>
+              </div>
+              <div class="window-item-description" id="profileWaterStreak">
+                Streak: 0 days
+              </div>
+            </div>
+            <div class="window-item">
+              <div class="window-item-title">Member Since</div>
+              <div class="window-item-description" id="profileJoinDate">
+                Not set
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="justify-content: center" class="window-actions">
+          <button
+            style="display: none"
+            class="window-button"
+            onclick="showSetNamePrompt()"
+          >
+            Set Name
+          </button>
+          <button
+            style="display: none"
+            class="window-button"
+            onclick="showSetTitlePrompt()"
+          >
+            Set Title
+          </button>
+          <button class="window-button" onclick="showSetClassPrompt()">
+            Set Class
+          </button>
+          <button class="window-button" onclick="showSetBioPrompt()">
+            Set Bio
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quests Window -->
+    <div class="window" id="questsWindow">
+      <div class="window-header">
+        <div class="window-title">Active Quests</div>
+        <div class="window-controls">
+          <button class="window-minimize">-</button>
+          <button class="window-close">×</button>
+        </div>
+      </div>
+      <div class="window-content">
+        <div class="window-section">
+          <div class="window-section-title">Current Quests</div>
+          <div class="window-grid" id="activeQuestsList">
+            <!-- Quests will be dynamically added here -->
+          </div>
+        </div>
+        <div class="window-actions">
+          <button class="window-button add-quest" onclick="startQuestCreation('normal')">
+            Add New Quest
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Daily Quests Window -->
+    <div class="window" id="dailyQuestsWindow">
+      <div class="window-header">
+        <div class="window-title">Daily Quests</div>
+        <div class="window-controls">
+          <button class="window-minimize">-</button>
+          <button class="window-close">×</button>
+        </div>
+      </div>
+      <div class="window-content">
+        <div class="window-section">
+          <div class="window-section-title">Today's Quests</div>
+          <div class="window-grid" id="dailyQuestsList">
+            <!-- Daily quests will be dynamically added here -->
+          </div>
+        </div>
+        <div class="window-actions">
+          <button class="window-button add-quest" onclick="startQuestCreation('daily')">
+            Add Daily Quest
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Achievements Window -->
+    <div class="window" id="achievementsWindow">
+      <div class="window-header">
+        <div class="window-title">Achievements</div>
+        <div class="window-controls">
+          <button class="window-minimize">-</button>
+          <button class="window-close">×</button>
+        </div>
+      </div>
+      <div class="window-content">
+        <div class="window-section">
+          <div class="window-section-title">Unlocked Achievements</div>
+          <div class="window-grid" id="achievementsList">
+            <!-- Achievements will be dynamically added here -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shop Window -->
+    <div class="window" id="shopWindow">
+      <div class="window-header">
+        <div class="window-title">Shop</div>
+        <div class="window-controls">
+          <button class="window-minimize">-</button>
+          <button class="window-close">×</button>
+        </div>
+      </div>
+      <div class="window-content">
+        <div class="window-section">
+          <div class="window-section-title">Available Items</div>
+          <div class="window-grid" id="shopItemsList">
+            <!-- Shop items will be dynamically added here -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inventory Window -->
+    <div class="window" id="inventoryWindow">
+      <div class="window-header">
+        <div class="window-title">Inventory</div>
+        <div class="window-controls">
+          <button class="window-minimize">-</button>
+          <button class="window-close">×</button>
+        </div>
+      </div>
+      <div class="window-content">
+        <div class="window-section">
+          <div class="window-section-title">Your Items</div>
+          <div class="window-grid" id="inventoryItemsList">
+            <!-- Inventory items will be dynamically added here -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Boss Battles Window -->
+    <div class="window" id="bossBattlesWindow">
+      <div class="window-header">
+        <div class="window-title">Boss Battles</div>
+        <div class="window-controls">
+          <button class="window-minimize">-</button>
+          <button class="window-close">×</button>
+        </div>
+      </div>
+      <div class="window-content">
+        <div class="window-section">
+          <div class="window-section-title">Available Bosses</div>
+          <div class="window-grid" id="bossBattlesList">
+            <!-- Boss battles will be dynamically added here -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Leaderboard Window -->
+    <div class="window" id="leaderboardWindow">
+      <div class="window-header">
+        <div class="window-title">Leaderboard</div>
+        <div class="window-controls">
+          <button class="window-minimize">-</button>
+          <button class="window-close">×</button>
+        </div>
+      </div>
+      <div class="window-content">
+        <div class="window-section">
+          <div class="window-section-title">Top Players</div>
+          <div class="window-grid" id="leaderboardList">
+            <!-- Leaderboard entries will be dynamically added here -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shadow Army Window -->
+    <div class="window" id="shadowArmyWindow">
+      <div class="window-header">
+        <div class="window-title">Shadow Army</div>
+        <div class="window-controls">
+          <button class="window-minimize">-</button>
+          <button class="window-close">×</button>
+        </div>
+      </div>
+      <div class="window-content">
+        <div class="window-section">
+          <div class="window-section-title">Your Shadow Soldiers</div>
+          <div class="window-grid" id="shadowArmyList">
+            <!-- Shadow army content will be dynamically added here -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rank Progress Window -->
+    <div class="window" id="rankProgressWindow">
+      <div class="window-header">
+        <div class="window-title">Rank Progress</div>
+        <div class="window-controls">
+          <button class="window-minimize">-</button>
+          <button class="window-close">×</button>
+        </div>
+      </div>
+      <div class="window-content">
+        <div class="window-section">
+          <div class="window-section-title">Current Progress</div>
+          <div class="window-grid" id="rankProgressContent">
+            <!-- Rank progress content will be dynamically added here -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="window" id="soloInterfaceWindow">
+      <div class="window-header">
+        <div class="window-title">SOLO Interface</div>
+        <div class="window-controls">
+          <button class="window-close" onclick="closeSoloInterface()">×</button>
+        </div>
+      </div>
+      <!-- <div class="window-content">
+        <div class="window-section">
+          <div id="soloContainer">
+                   
+          </div>
+        </div>
+      </div> -->
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simplex-noise/2.4.0/simplex-noise.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script type="module" src="src/main.js"></script>    
+  </body>
+</html>
+
+
