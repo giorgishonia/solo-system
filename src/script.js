@@ -1,14 +1,19 @@
-import CONFIG from './config.js';
 import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.module.js'; // Adjust version as needed
+import BOSSES from './bosses.js';
+import ITEMS from './items.js';
+import ACHIEVEMENTS from './achievements.js';
+import { showProfile } from './profile.js';
+import { showInventory } from './inventory.js';
+import { showHelp } from './commands.js';
 
 const firebaseConfig = {
-  apiKey: CONFIG.FIREBASE_API_KEY,
-  authDomain: CONFIG.FIREBASE_AUTH_DOMAIN,
-  projectId: CONFIG.FIREBASE_PROJECT_ID,
-  storageBucket: CONFIG.FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: CONFIG.FIREBASE_MESSAGING_SENDER_ID,
-  appId: CONFIG.FIREBASE_APP_ID,
-  measurementId: CONFIG.FIREBASE_MEASUREMENT_ID,
+  apiKey: "AIzaSyAEpfs-P81k4vagCAPlrW_qOXEysllMjGg",
+  authDomain: "reawakening-fe981.firebaseapp.com",
+  projectId: "reawakening-fe981",
+  storageBucket: "reawakening-fe981.appspot.com",
+  messagingSenderId: "310750239922",
+  appId: "1:310750239922:web:cdfb7c87f2e05c52553dab",
+  measurementId: "G-WLY0K1N1TG",
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -346,7 +351,7 @@ function showNotificationsWindow() {
 }
 
 // Command Handler
-window.commands = {
+const commands = {
   "!commands": showHelp,
   "!c": showHelp,
   "!reawaken": handleReawaken,
@@ -362,8 +367,8 @@ window.commands = {
   "!lb": showLeaderboard,
   "!achievements": showAchievements,
   "!ach": showAchievements,
-  "!profile": showProfile,
-  "!p": showProfile,
+  "!profile": () => showProfile(isAuthenticated),
+  "!p": () => showProfile(isAuthenticated),
   "!inventory": showInventory,
   "!i": showInventory,
   "!shop": showShop,
@@ -444,108 +449,7 @@ window.commands = {
 // Add to command handlers
 commands["!penalty"] = handlePenaltyCommand;
 
-// Add these helper functions
-function showHelp(args) {
-  if (!args || args.length === 0) {
-    // Show categories only
-    printToTerminal("[ SYSTEM COMMANDS ] 📜");
-    printToTerminal("--------------------------------------------");
-    printToTerminal("!commands general - General Commands");
-    printToTerminal("!commands profile - User Authentication & Profile");
-    printToTerminal("!commands quests - Quests & Progression");
-    printToTerminal("!commands status - Player Status & Progress");
-    printToTerminal("!commands achievements - Achievements & Leaderboards");
-    printToTerminal("!commands inventory - Inventory & Shop");
-    printToTerminal("!commands water - Water Tracking");
-    printToTerminal(
-      "\n> Each category contains specific commands for that area."
-    );
-    printToTerminal("> Type the category command to see detailed commands.");
-    printToTerminal("--------------------------------------------");
-    return;
-  }
 
-  // Handle category-specific commands
-  const category = args[0].toLowerCase();
-  switch (category) {
-    case "general":
-      printToTerminal("\n=== 📜 GENERAL COMMANDS ===", "system");
-      printToTerminal("!commands, !c - Show all commands");
-      printToTerminal("!clear, !cl - Clear the terminal");
-      printToTerminal("!sleep - Log out (Enter sleep mode)");
-      printToTerminal(
-        "!simulate - Simulate daily quest timeout [Testing]",
-        "warning"
-      );
-      break;
-
-    case "auth":
-    case "profile":
-      printToTerminal("\n=== 🛡️ USER AUTHENTICATION & PROFILE ===", "system");
-      printToTerminal("!reawaken, !r - Authenticate user");
-      printToTerminal("!profile, !p - Show player profile");
-      printToTerminal("!setname <name> - Set hunter name");
-      printToTerminal("!settitle <title> - Set your title");
-      printToTerminal("!setbio <text> - Set your profile bio");
-      printToTerminal("!setclass <class> - Set your hunter class");
-      break;
-
-    case "quests":
-    case "quest":
-      printToTerminal("\n=== 🎯 QUESTS & PROGRESSION ===", "system");
-      printToTerminal("!quests, !q - Show active quests");
-      printToTerminal("!dailyquests, !dq - Show daily quests");
-      printToTerminal("!addquest, !aq - Create a new quest");
-      printToTerminal("!adddailyquest, !adq - Create a daily quest");
-      printToTerminal(
-        "!update <quest_id> <type> <amount> - Update quest progress"
-      );
-      break;
-
-    case "status":
-    case "progress":
-      printToTerminal("\n=== 📊 PLAYER STATUS & PROGRESS ===", "system");
-      printToTerminal("!status, !s - Show player status");
-      printToTerminal("!addxp, !ax - Add experience points");
-      printToTerminal("!reset - Reset progress (level, exp, gold)", "warning");
-      break;
-
-    case "achievements":
-    case "leaderboard":
-      printToTerminal("\n=== 🏆 ACHIEVEMENTS & LEADERBOARDS ===", "system");
-      printToTerminal("!achievements, !ach - Show unlocked achievements");
-      printToTerminal("!leaderboard, !lb - Show global leaderboard");
-      break;
-
-    case "inventory":
-    case "shop":
-      printToTerminal("\n=== 🎒 INVENTORY & SHOP ===", "system");
-      printToTerminal("!inventory, !i - Show player inventory");
-      printToTerminal("!shop, !sh - Open the shop");
-      break;
-
-    case "water":
-      printToTerminal("\n=== 💧 WATER TRACKING ===", "system");
-      printToTerminal("!waterDrank, !wd <glasses> - Track water intake");
-      printToTerminal("!waterStatus, !ws - Show water intake progress");
-      break;
-
-    case "motivation":
-      printToTerminal("\n=== 💪 MOTIVATION ===", "system");
-      printToTerminal("!motivation, !m - Get a motivational quote");
-      break;
-    default:
-      printToTerminal("Unknown category. Available categories:", "warning");
-      printToTerminal("!commands general - General commands");
-      printToTerminal("!commands profile - Profile & authentication");
-      printToTerminal("!commands quests - Quest management");
-      printToTerminal("!commands status - Player status");
-      printToTerminal("!commands achievements - Achievements");
-      printToTerminal("!commands inventory - Inventory");
-      printToTerminal("!commands water - Water tracking");
-      break;
-  }
-}
 
 // Quest creation state
 let creatingQuest = false;
@@ -751,6 +655,44 @@ window.fetchNormalQuests = async function fetchNormalQuests() {
   return [
     { title: "Normal Quest 1", description: "Complete the first normal quest.", progress: 0, goal: 1 },
   ];
+}
+
+async function autoCompleteQuests() {
+  if (!isAuthenticated) {
+    printToTerminal("You must !reawaken first.", "error");
+    return;
+  }
+
+  try {
+    const playerRef = db.collection("players").doc(currentUser.uid);
+    const questsSnapshot = await playerRef.collection("quests").get();
+
+    questsSnapshot.forEach(async (doc) => {
+      const quest = doc.data();
+
+      // Check if quest is already completed
+      if (quest.completed) return;
+
+      // Automatically complete the quest
+      await updateQuestProgress(doc.id, "normal", "complete");
+      printToTerminal(`Quest "${quest.title}" completed automatically!`, "success");
+    });
+
+    const dailyQuestsSnapshot = await playerRef.collection("dailyQuests").get();
+
+    dailyQuestsSnapshot.forEach(async (doc) => {
+      const quest = doc.data();
+
+      // Check if quest is already completed today
+      if (quest.completed && quest.lastCompletion && wasCompletedToday(quest.lastCompletion)) return;
+
+      // Automatically complete the daily quest
+      await updateQuestProgress(doc.id, "daily", "complete");
+      printToTerminal(`Daily quest "${quest.title}" completed automatically!`, "success");
+    });
+  } catch (error) {
+    printToTerminal("Error completing quests: " + error.message, "error");
+  }
 }
 
 window.printToTerminal = async function printToTerminal(text, type = "default") {
@@ -1375,459 +1317,6 @@ window.PlayerDB = class PlayerDB {
   }
 }
 
-// Achievement definitions
-window.ACHIEVEMENTS = {
-  // Level Achievements
-  NOVICE_HUNTER: {
-    id: "novice_hunter",
-    name: "Novice Hunter",
-    description: "Reach level 5",
-    ranks: [
-      { rank: 1, requirement: 5, reward: { exp: 50, gold: 25 } },
-      { rank: 2, requirement: 10, reward: { exp: 100, gold: 50 } },
-      { rank: 3, requirement: 25, reward: { exp: 200, gold: 100 } },
-      { rank: 4, requirement: 50, reward: { exp: 400, gold: 200 } },
-      { rank: 5, requirement: 100, reward: { exp: 800, gold: 400 } },
-    ],
-    currentRank: 0,
-    type: "level",
-    icon: "🌟",
-  },
-
-  // Quest Achievements
-  QUEST_MASTER: {
-    id: "quest_master",
-    name: "Quest Master",
-    description: "Complete quests",
-    ranks: [
-      { rank: 1, requirement: 5, reward: { exp: 25, gold: 15 } },
-      { rank: 2, requirement: 10, reward: { exp: 50, gold: 25 } },
-      { rank: 3, requirement: 25, reward: { exp: 100, gold: 50 } },
-      { rank: 4, requirement: 50, reward: { exp: 200, gold: 100 } },
-      { rank: 5, requirement: 100, reward: { exp: 400, gold: 200 } },
-    ],
-    currentRank: 0,
-    type: "quests_completed",
-    icon: "📚",
-  },
-
-  // Streak Achievements
-  STREAK_WARRIOR: {
-    id: "streak_warrior",
-    name: "Streak Warrior",
-    description: "Maintain a daily streak",
-    ranks: [
-      { rank: 1, requirement: 3, reward: { exp: 25, gold: 15 } },
-      { rank: 2, requirement: 7, reward: { exp: 100, gold: 50 } },
-      { rank: 3, requirement: 14, reward: { exp: 200, gold: 100 } },
-      { rank: 4, requirement: 30, reward: { exp: 400, gold: 200 } },
-      { rank: 5, requirement: 60, reward: { exp: 800, gold: 400 } },
-    ],
-    currentRank: 0,
-    type: "daily_streak",
-    icon: "🔥",
-  },
-
-  // Water Intake Achievements
-  HYDRATION_MASTER: {
-    id: "hydration_master",
-    name: "Hydration Master",
-    description: "Maintain a water intake streak",
-    ranks: [
-      { rank: 1, requirement: 3, reward: { exp: 50, gold: 25 } },
-      { rank: 2, requirement: 7, reward: { exp: 100, gold: 50 } },
-      { rank: 3, requirement: 14, reward: { exp: 200, gold: 100 } },
-      { rank: 4, requirement: 30, reward: { exp: 500, gold: 250 } },
-      { rank: 5, requirement: 60, reward: { exp: 1000, gold: 500 } },
-    ],
-    currentRank: 0,
-    type: "water_streak",
-    icon: "💧",
-  },
-
-  // Gold Achievements
-  GOLD_BARON: {
-    id: "gold_baron",
-    name: "Gold Baron",
-    description: "Accumulate gold",
-    ranks: [
-      { rank: 1, requirement: 1000, reward: { exp: 100, gold: 50 } },
-      { rank: 2, requirement: 5000, reward: { exp: 300, gold: 150 } },
-      { rank: 3, requirement: 10000, reward: { exp: 500, gold: 250 } },
-      { rank: 4, requirement: 25000, reward: { exp: 1000, gold: 500 } },
-      { rank: 5, requirement: 50000, reward: { exp: 2000, gold: 1000 } },
-    ],
-    currentRank: 0,
-    type: "total_gold",
-    icon: "💎",
-  },
-
-  // Rank Achievements
-  RANK_MASTER: {
-    id: "rank_master",
-    name: "Rank Master",
-    description: "Achieve higher ranks",
-    ranks: [
-      { rank: 1, requirement: "D", reward: { exp: 100, gold: 50 } },
-      { rank: 2, requirement: "C", reward: { exp: 200, gold: 100 } },
-      { rank: 3, requirement: "B", reward: { exp: 300, gold: 150 } },
-      { rank: 4, requirement: "A", reward: { exp: 400, gold: 200 } },
-      { rank: 5, requirement: "S", reward: { exp: 500, gold: 250 } },
-    ],
-    currentRank: 0,
-    type: "rank",
-    icon: "👑",
-  },
-
-  // Shadow Army Achievements
-  SHADOW_MASTER: {
-    id: "shadow_master",
-    name: "Shadow Master",
-    description: "Build your shadow army",
-    ranks: [
-      { rank: 1, requirement: 1, reward: { exp: 100, gold: 50 }, description: "Extract your first shadow" },
-      { rank: 2, requirement: 5, reward: { exp: 200, gold: 100 }, description: "Have 5 shadows" },
-      { rank: 3, requirement: 10, reward: { exp: 300, gold: 150 }, description: "Have 10 shadows" },
-      { rank: 4, requirement: 25, reward: { exp: 400, gold: 200 }, description: "Have 25 shadows" },
-      { rank: 5, requirement: 50, reward: { exp: 500, gold: 250 }, description: "Have 50 shadows" }
-    ],
-    currentRank: 0,
-    type: "shadow_count",
-    icon: "👻"
-  },
-  SHADOW_EVOLUTION: {
-    id: "shadow_evolution",
-    name: "Shadow Evolution",
-    description: "Upgrade your shadows to higher tiers",
-    ranks: [
-      { rank: 1, requirement: 1, reward: { exp: 200, gold: 100 }, description: "Have 1 Elite Shadow" },
-      { rank: 2, requirement: 1, reward: { exp: 400, gold: 200 }, description: "Have 1 Shadow General" },
-      { rank: 3, requirement: 1, reward: { exp: 600, gold: 300 }, description: "Have 1 Shadow Monarch" },
-      { rank: 4, requirement: 3, reward: { exp: 800, gold: 400 }, description: "Have 3 Shadow Monarchs" },
-      { rank: 5, requirement: 5, reward: { exp: 1000, gold: 500 }, description: "Have 5 Shadow Monarchs" }
-    ],
-    currentRank: 0,
-    type: "shadow_tier",
-    icon: "👑"
-  }
-};
-
-
-
-window.ITEMS = {
-  // 🎓 XP & Level Boosters
-  MINOR_XP_BOOST: {
-    id: "minor_xp_boost",
-    name: "Minor XP Boost",
-    description: "Increases XP gain by 10% for 30 minutes",
-    price: 50,
-    category: "booster",
-    rankRequired: "E",
-    duration: 1800000, // 30 minutes
-    effect: { type: "global_xp", value: 1.1 },
-  },
-  GOLDEN_GRIMOIRE: {
-    id: "golden_grimoire",
-    name: "Golden Grimoire",
-    description: "Increases XP gain from all activities by 25% for 2 hours",
-    price: 250,
-    category: "booster",
-    rankRequired: "D",
-    duration: 7200000, // 2 hours
-    effect: { type: "global_xp", value: 1.25 },
-  },
-  RULERS_AUTHORITY: {
-    id: "rulers_authority",
-    name: "Ruler's Authority",
-    description: "Triples XP gain from all sources for 30 minutes",
-    price: 1000,
-    category: "booster",
-    rankRequired: "A",
-    duration: 1800000, // 30 minutes
-    effect: { type: "global_xp", value: 3.0 },
-  },
-
-  // 🎯 Quest & Progress
-  BASIC_QUEST_BOOST: {
-    id: "basic_quest_boost",
-    name: "Basic Quest Boost",
-    description: "Increases quest progress speed by 20% for 30 minutes",
-    price: 75,
-    category: "enhancer",
-    rankRequired: "E",
-    duration: 1800000, // 30 minutes
-    effect: { type: "quest_progress", value: 1.2 },
-  },
-  MONARCHS_BLESSING: {
-    id: "monarchs_blessing",
-    name: "Monarch's Blessing",
-    description: "Triples all quest rewards and progress for 30 minutes",
-    price: 800,
-    category: "enhancer",
-    rankRequired: "B",
-    duration: 1800000, // 30 minutes
-    effect: { type: "quest_rewards", value: 3.0 },
-  },
-
-  // 🏆 Permanent Upgrades
-  MINOR_UPGRADE: {
-    id: "minor_upgrade",
-    name: "Minor Upgrade",
-    description: "Permanently increases all XP gain by 2%",
-    price: 100,
-    category: "upgrade",
-    rankRequired: "E",
-    effect: { type: "permanent_xp", value: 1.02 },
-  },
-  GOLD_MAGNET: {
-    id: "gold_magnet",
-    name: "Gold Magnet",
-    description: "Permanently increases gold earned from all sources by 15%",
-    price: 2000,
-    category: "upgrade",
-    rankRequired: "A",
-    effect: { type: "gold_multiplier", value: 1.15 },
-  },
-  MONARCHS_DOMAIN: {
-    id: "monarchs_domain",
-    name: "Monarch's Domain",
-    description: "Permanently increases all stats by 20%",
-    price: 5000,
-    category: "upgrade",
-    rankRequired: "S",
-    effect: { type: "all_stats", value: 1.2 },
-  },
-
-  // 🎨 Profile Customization
-  CUSTOM_NAME_COLOR: {
-    id: "custom_name_color",
-    name: "Custom Name Color",
-    description: "Change the color of your name in rankings and messages",
-    price: 500,
-    category: "cosmetic",
-    rankRequired: "E",
-    effect: { type: "name_color", value: true },
-  },
-  PROFILE_SHOWCASE: {
-    id: "profile_showcase",
-    name: "Profile Showcase",
-    description: "Unlocks custom profile layout and background themes",
-    price: 800,
-    category: "cosmetic",
-    rankRequired: "D",
-    effect: { type: "profile_custom", value: true },
-  },
-  LEVEL_EFFECT: {
-    id: "level_effect",
-    name: "Level-Up Effect",
-    description: "Adds custom visual effects when you level up",
-    price: 1000,
-    category: "cosmetic",
-    rankRequired: "C",
-    effect: { type: "level_visual", value: true },
-  },
-
-  // 👑 Titles
-  TITLE_SHADOW_MONARCH: {
-    id: "title_shadow_monarch",
-    name: 'Title: "Shadow Monarch"',
-    description: "The ultimate title reserved for the strongest",
-    price: 5000,
-    category: "title",
-    rankRequired: "S",
-    effect: { type: "title", value: "Shadow Monarch" },
-  },
-  TITLE_ARISE: {
-    id: "title_arise",
-    name: 'Title: "ARISE"',
-    description: "The ultimate command of the Shadow Monarch",
-    price: 10000,
-    category: "title",
-    rankRequired: "S",
-    effect: { type: "title", value: "ARISE" },
-  },
-
-  // Colored Title Items
-  TITLE_CRIMSON_LORD: {
-    id: "title_crimson_lord",
-    name: 'Title: "Crimson Lord"',
-    description: "A blood-red title for those who command respect",
-    price: 3000,
-    category: "title",
-    rankRequired: "A",
-    effect: { type: "title", value: "Crimson Lord", color: "#ff3333" },
-  },
-  TITLE_FROST_SOVEREIGN: {
-    id: "title_frost_sovereign",
-    name: 'Title: "Frost Sovereign"',
-    description: "An icy blue title for the masters of cold",
-    price: 3000,
-    category: "title",
-    rankRequired: "A",
-    effect: { type: "title", value: "Frost Sovereign", color: "#33ccff" },
-  },
-  TITLE_EMERALD_SAGE: {
-    id: "title_emerald_sage",
-    name: 'Title: "Emerald Sage"',
-    description: "A mystical green title for the wisest hunters",
-    price: 3000,
-    category: "title",
-    rankRequired: "A",
-    effect: { type: "title", value: "Emerald Sage", color: "#33ff66" },
-  },
-  TITLE_GOLDEN_EMPEROR: {
-    id: "title_golden_emperor",
-    name: 'Title: "Golden Emperor"',
-    description: "A majestic golden title for the wealthiest hunters",
-    price: 5000,
-    category: "title",
-    rankRequired: "S",
-    effect: { type: "title", value: "Golden Emperor", color: "#ffcc33" },
-  },
-
-  // 🌟 Special Items
-  DAILY_QUEST_RESET: {
-    id: "daily_quest_reset",
-    name: "Daily Quest Reset",
-    description: "Reset all daily quests immediately",
-    price: 750,
-    category: "special",
-    rankRequired: "B",
-    effect: { type: "reset_daily", value: true },
-  },
-  DEMON_KINGS_SOUL: {
-    id: "demon_kings_soul",
-    name: "Demon King's Soul",
-    description: "Grants immense power for 5 minutes",
-    price: 5000,
-    category: "special",
-    rankRequired: "A",
-    duration: 300000, // 5 minutes
-    effect: { type: "all_stats", value: 5.0 },
-  },
-
-  // 🆕 New Features
-  QUEST_CHAIN: {
-    id: "quest_chain",
-    name: "Quest Chain",
-    description: "Unlock chain quests that give increasing rewards for consecutive completion",
-    price: 1500,
-    category: "special",
-    rankRequired: "C",
-    effect: { type: "quest_chain", value: true },
-  },
-  ACHIEVEMENT_TRACKER: {
-    id: "achievement_tracker",
-    name: "Achievement Tracker",
-    description: "Shows hidden achievements and tracks progress in real-time",
-    price: 1000,
-    category: "special",
-    rankRequired: "D",
-    effect: { type: "achievement_tracking", value: true },
-  },
-  CUSTOM_MILESTONES: {
-    id: "custom_milestones",
-    name: "Custom Milestones",
-    description: "Create and track personal milestones with custom rewards",
-    price: 2000,
-    category: "special",
-    rankRequired: "C",
-    effect: { type: "milestone_custom", value: true },
-  },
-  SHADOW_ARMY_DISPLAY: {
-    id: "shadow_army_display",
-    name: "Shadow Army Display",
-    description: "Shows your shadow army progress and achievements on profile",
-    price: 1500,
-    category: "cosmetic",
-    rankRequired: "B",
-    effect: { type: "army_display", value: true },
-  },
-  RANK_INSIGNIA: {
-    id: "rank_insignia",
-    name: "Rank Insignia",
-    description: "Displays a special badge next to your name based on your rank",
-    price: 1000,
-    category: "cosmetic",
-    rankRequired: "C",
-    effect: { type: "rank_badge", value: true },
-  },
-  DUNGEON_LOG: {
-    id: "dungeon_log",
-    name: "Dungeon Log",
-    description: "Tracks and displays your dungeon clear history and statistics",
-    price: 800,
-    category: "special",
-    rankRequired: "D",
-    effect: { type: "dungeon_history", value: true },
-  },
-
-  // 🖤 Shadow Abilities
-  SHADOW_EXTRACTION: {
-    id: "shadow_extraction",
-    name: "Shadow Extraction",
-    description: "Unlocks the ability to extract shadows from defeated bosses",
-    price: 3000,
-    category: "shadow",
-    rankRequired: "A",
-    effect: { type: "shadow_ability", value: "extraction" }
-  },
-  SHADOW_STORAGE_1: {
-    id: "shadow_storage_1",
-    name: "Shadow Storage I",
-    description: "Increases maximum shadow soldier capacity by 10",
-    price: 1000,
-    category: "shadow",
-    rankRequired: "B",
-    effect: { type: "max_shadows", value: 10 }
-  },
-  SHADOW_STORAGE_2: {
-    id: "shadow_storage_2",
-    name: "Shadow Storage II",
-    description: "Increases maximum shadow soldier capacity by 25",
-    price: 2500,
-    category: "shadow",
-    rankRequired: "A",
-    effect: { type: "max_shadows", value: 25 }
-  },
-  SHADOW_STORAGE_3: {
-    id: "shadow_storage_3",
-    name: "Shadow Storage III",
-    description: "Increases maximum shadow soldier capacity by 50",
-    price: 5000,
-    category: "shadow",
-    rankRequired: "S",
-    effect: { type: "max_shadows", value: 50 }
-  },
-  ELITE_SHADOW_UPGRADE: {
-    id: "elite_shadow_upgrade",
-    name: "Elite Shadow Upgrade",
-    description: "Unlocks the ability to create Elite Shadow Soldiers",
-    price: 4000,
-    category: "shadow",
-    rankRequired: "A",
-    effect: { type: "shadow_tier", value: "elite" }
-  },
-  GENERAL_SHADOW_UPGRADE: {
-    id: "general_shadow_upgrade",
-    name: "General Shadow Upgrade",
-    description: "Unlocks the ability to create Shadow Generals",
-    price: 6000,
-    category: "shadow",
-    rankRequired: "S",
-    effect: { type: "shadow_tier", value: "general" }
-  },
-  MONARCH_SHADOW_UPGRADE: {
-    id: "monarch_shadow_upgrade",
-    name: "Monarch Shadow Upgrade",
-    description: "Unlocks the ability to create Shadow Monarchs",
-    price: 10000,
-    category: "shadow",
-    rankRequired: "S",
-    effect: { type: "shadow_tier", value: "monarch" }
-  },
-};
-
 // Leaderboard function
 async function showLeaderboard() {
   if (!isAuthenticated) {
@@ -1952,83 +1441,6 @@ window.checkAchievements = async function checkAchievements() {
   }
 }
 
-
-// Profile system
-async function showProfile() {
-  if (!isAuthenticated) {
-    printToTerminal("You must !reawaken first.", "error");
-    return;
-  }
-
-  const playerRef = db.collection("players").doc(currentUser.uid);
-  const player = (await playerRef.get()).data();
-
-  // Ensure profile exists
-  if (!player.profile) {
-    player.profile = {
-      name: "",
-      title: "Novice",
-      picture: "default.png",
-      bio: "",
-      class: "Hunter",
-      joinDate: null,
-    };
-    // Update the player document with initialized profile
-    await playerRef.update({ profile: player.profile });
-  }
-
-  printToTerminal("\n=== PLAYER PROFILE ===", "system");
-  printToTerminal(`Name: ${player.profile.name || "Not set"}`, "info");
-  printToTerminal(`Title: ${player.profile.title || "Novice"}`, "info");
-  printToTerminal(`Class: ${player.profile.class || "Hunter"}`, "info");
-  if (player.profile.bio) {
-    printToTerminal(`\nBio: ${player.profile.bio}`, "info");
-  }
-  printToTerminal("\nStats:", "info");
-  printToTerminal(`Level: ${player.level}`, "info");
-  printToTerminal(`EXP: ${player.exp}/100`, "info");
-  printToTerminal(`Gold: ${player.gold}`, "info");
-  printToTerminal(`Rank: ${player.rank}`, "info");
-  printToTerminal(`Daily Streak: ${player.streak} days`, "info");
-  printToTerminal(`Quests Completed: ${player.questsCompleted}`, "info");
-
-
-  if (player.waterIntake?.streakDays > 0) {
-    printToTerminal(
-      `Water Streak: ${player.waterIntake.streakDays} days`,
-      "info"
-    );
-  }
-
-  printToTerminal("\nAchievements:", "info");
-  if (!player.achievements || player.achievements.length === 0) {
-    printToTerminal("No achievements yet", "warning");
-  } else {
-    player.achievements.forEach((achievementId) => {
-      const achievement = Object.values(ACHIEVEMENTS).find(
-        (a) => a.id === achievementId
-      );
-      if (achievement) {
-        printToTerminal(`- ${achievement.name}`, "info");
-      }
-    });
-  }
-
-  printToTerminal("\nProfile Commands:", "system");
-  printToTerminal("!setname <name> - Set your hunter name", "info");
-  printToTerminal("!settitle <title> - Set your title", "info");
-  printToTerminal("!setbio <text> - Set your profile bio", "info");
-  printToTerminal("!setclass <class> - Set your hunter class", "info");
-}
-
-// Inventory system
-async function showInventory() {
-  if (!isAuthenticated) {
-    printToTerminal("You must !reawaken first.", "error");
-    return;
-  }
-  windowSystem.showWindow("inventoryWindow");
-}
 
 window.getExpNeededForLevel = function getExpNeededForLevel(level) {
   // Adjusted curve for 6-month progression to level 100
@@ -2689,685 +2101,6 @@ async function handleReset(args) {
   awaitingResetConfirmation = false;
 }
 
-// Boss Battle definitions
-const BOSSES = {
-  SHADOW_KING: {
-    id: "shadow_king",
-    name: "Shadow King",
-    description:
-      "Train in the darkness to unlock your hidden strength. Complete 60 minutes of night training (after 8 PM).",
-    baseTargetCount: 60,
-    targetCount: 60,
-    metric: "minutes",
-    timeLimit: 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 200,  // Reduced from 500
-      gold: 100, // Reduced from 250
-      title: "Ruler of Shadows",
-    },
-    scaling: {
-      targetCount: 5,
-      rewards: {
-        exp: 25,  // Reduced from 75
-        gold: 15, // Reduced from 35
-      },
-    },
-  },
-
-  MONARCH_OF_FLESH: {
-    id: "monarch_of_flesh",
-    name: "Monarch of Flesh",
-    description:
-      "Push your body to its limit. Complete 150 push-ups within 24 hours.",
-    baseTargetCount: 150,
-    targetCount: 150,
-    metric: "push-ups",
-    timeLimit: 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 250,  // Reduced from 600
-      gold: 125, // Reduced from 300
-      title: "Body of a Warrior",
-    },
-    scaling: {
-      targetCount: 10,
-      rewards: {
-        exp: 30,  // Reduced from 100
-        gold: 20, // Reduced from 50
-      },
-    },
-  },
-
-  IRON_FIST: {
-    id: "iron_fist",
-    name: "Iron Fist",
-    description:
-      "Forge your fists in fire. Complete 200 push-ups in a single session.",
-    baseTargetCount: 200,
-    targetCount: 200,
-    metric: "push-ups",
-    timeLimit: 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 300,  // Reduced from 800
-      gold: 150, // Reduced from 400
-      title: "Unbreakable Fist",
-    },
-    scaling: {
-      targetCount: 20,
-      rewards: {
-        exp: 35,  // Reduced from 100
-        gold: 20, // Reduced from 50
-      },
-    },
-  },
-
-  CORE_OVERLORD: {
-    id: "core_overlord",
-    name: "Core Overlord",
-    description:
-      "Dominate your core. Complete 300 sit-ups in a single session.",
-    baseTargetCount: 300,
-    targetCount: 300,
-    metric: "sit-ups",
-    timeLimit: 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 350,  // Reduced from 900
-      gold: 175, // Reduced from 450
-      title: "Master of the Core",
-    },
-    scaling: {
-      targetCount: 30,
-      rewards: {
-        exp: 40,  // Reduced from 100
-        gold: 25, // Reduced from 50
-      },
-    },
-  },
-
-  PUSHUP_WARLORD: {
-    id: "pushup_warlord",
-    name: "Push-Up Warlord",
-    description:
-      "Conquer the ultimate push-up challenge. Complete 100 push-ups in 10 minutes.",
-    baseTargetCount: 100,
-    targetCount: 100,
-    metric: "push-ups",
-    timeLimit: 10 * 60 * 1000,
-    rewards: {
-      exp: 275,  // Reduced from 700
-      gold: 140, // Reduced from 350
-      title: "Push-Up Champion",
-    },
-    scaling: {
-      targetCount: 10,
-      rewards: {
-        exp: 30,  // Reduced from 75
-        gold: 15, // Reduced from 35
-      },
-    },
-  },
-
-  SITUP_SORCERER: {
-    id: "situp_sorcerer",
-    name: "Sit-Up Sorcerer",
-    description:
-      "Harness the magic of endurance. Complete 150 sit-ups in 15 minutes.",
-    baseTargetCount: 150,
-    targetCount: 150,
-    metric: "sit-ups",
-    timeLimit: 15 * 60 * 1000,
-    rewards: {
-      exp: 300,  // Reduced from 750
-      gold: 150, // Reduced from 375
-      title: "Core Mage",
-    },
-    scaling: {
-      targetCount: 15,
-      rewards: {
-        exp: 35,  // Reduced from 75
-        gold: 20, // Reduced from 35
-      },
-    },
-  },
-
-  PUSHUP_TITAN: {
-    id: "pushup_titan",
-    name: "Push-Up Titan",
-    description: "Prove your might. Complete 500 push-ups in a week.",
-    baseTargetCount: 500,
-    targetCount: 500,
-    metric: "push-ups",
-    timeLimit: 7 * 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 1000,
-      gold: 500,
-      title: "Titan of Push-Ups",
-    },
-    scaling: {
-      targetCount: 50,
-      rewards: {
-        exp: 150,
-        gold: 75,
-      },
-    },
-  },
-
-  SITUP_SENTINEL: {
-    id: "situp_sentinel",
-    name: "Sit-Up Sentinel",
-    description: "Guard your core. Complete 1,000 sit-ups in a week.",
-    baseTargetCount: 1000,
-    targetCount: 1000,
-    metric: "sit-ups",
-    timeLimit: 7 * 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 1200,
-      gold: 600,
-      title: "Core Sentinel",
-    },
-    scaling: {
-      targetCount: 100,
-      rewards: {
-        exp: 150,
-        gold: 75,
-      },
-    },
-  },
-
-  PUSHUP_PHANTOM: {
-    id: "pushup_phantom",
-    name: "Push-Up Phantom",
-    description: "Move like a shadow. Complete 50 push-ups in 5 minutes.",
-    baseTargetCount: 50,
-    targetCount: 50,
-    metric: "push-ups",
-    timeLimit: 5 * 60 * 1000,
-    rewards: {
-      exp: 600,
-      gold: 300,
-      title: "Shadow Pusher",
-    },
-    scaling: {
-      targetCount: 5,
-      rewards: {
-        exp: 50,
-        gold: 25,
-      },
-    },
-  },
-
-  SITUP_SPECTER: {
-    id: "situp_specter",
-    name: "Sit-Up Specter",
-    description: "Haunt your core. Complete 75 sit-ups in 7 minutes.",
-    baseTargetCount: 75,
-    targetCount: 75,
-    metric: "sit-ups",
-    timeLimit: 7 * 60 * 1000,
-    rewards: {
-      exp: 650,
-      gold: 325,
-      title: "Ghost of the Core",
-    },
-    scaling: {
-      targetCount: 7,
-      rewards: {
-        exp: 50,
-        gold: 25,
-      },
-    },
-  },
-
-  PUSHUP_DRAGON: {
-    id: "pushup_dragon",
-    name: "Push-Up Dragon",
-    description:
-      "Breathe fire into your arms. Complete 300 push-ups in 30 minutes.",
-    baseTargetCount: 300,
-    targetCount: 300,
-    metric: "push-ups",
-    timeLimit: 30 * 60 * 1000,
-    rewards: {
-      exp: 900,
-      gold: 450,
-      title: "Dragon of Strength",
-    },
-    scaling: {
-      targetCount: 30,
-      rewards: {
-        exp: 100,
-        gold: 50,
-      },
-    },
-  },
-
-  SITUP_SERPENT: {
-    id: "situp_serpent",
-    name: "Sit-Up Serpent",
-    description: "Coil your core. Complete 200 sit-ups in 20 minutes.",
-    baseTargetCount: 200,
-    targetCount: 200,
-    metric: "sit-ups",
-    timeLimit: 20 * 60 * 1000,
-    rewards: {
-      exp: 800,
-      gold: 400,
-      title: "Serpent of the Core",
-    },
-    scaling: {
-      targetCount: 20,
-      rewards: {
-        exp: 100,
-        gold: 50,
-      },
-    },
-  },
-
-  GATE_KEEPER: {
-    id: "gate_keeper",
-    name: "Gate Keeper",
-    description:
-      "Pass through the threshold of strength. Run 5 kilometers in a single session.",
-    baseTargetCount: 5,
-    targetCount: 5,
-    metric: "kilometers",
-    timeLimit: 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 700,
-      gold: 350,
-      title: "Breaker of Chains",
-    },
-    scaling: {
-      targetCount: 0.5,
-      rewards: {
-        exp: 100,
-        gold: 50,
-      },
-    },
-  },
-
-  RULER_OF_STAMINA: {
-    id: "ruler_of_stamina",
-    name: "Ruler of Stamina",
-    description:
-      "Survive the test of endurance. Burn 2,000 calories in a week.",
-    baseTargetCount: 2000,
-    targetCount: 2000,
-    metric: "calories",
-    timeLimit: 7 * 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 800,
-      gold: 400,
-      title: "Everlasting Hunter",
-    },
-    scaling: {
-      targetCount: 200,
-      rewards: {
-        exp: 100,
-        gold: 50,
-      },
-    },
-  },
-
-  TITAN_SLAYER: {
-    id: "titan_slayer",
-    name: "Titan Slayer",
-    description:
-      "Overcome the mightiest. Lift a total of 5,000 kg in weight training.",
-    baseTargetCount: 5000,
-    targetCount: 5000,
-    metric: "kilograms lifted",
-    timeLimit: 7 * 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 1000,
-      gold: 500,
-      title: "Crusher of Giants",
-    },
-    scaling: {
-      targetCount: 500,
-      rewards: {
-        exp: 150,
-        gold: 75,
-      },
-    },
-  },
-  PHANTOM_RUNNER: {
-    id: "phantom_runner",
-    name: "Phantom Runner",
-    description: "Outpace the unseen. Run 10 kilometers in under 60 minutes.",
-    baseTargetCount: 10,
-    targetCount: 10,
-    metric: "kilometers",
-    timeLimit: 60 * 60 * 1000,
-    rewards: {
-      exp: 750,
-      gold: 375,
-      title: "Speed Demon",
-    },
-    scaling: {
-      targetCount: 1,
-      rewards: {
-        exp: 100,
-        gold: 50,
-      },
-    },
-  },
-
-  IRON_WILL: {
-    id: "iron_will",
-    name: "Iron Will",
-    description: "Forge your mind and body. Hold a plank for 5 minutes.",
-    baseTargetCount: 5,
-    targetCount: 5,
-    metric: "minutes",
-    timeLimit: 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 400,
-      gold: 200,
-      title: "Unbreakable",
-    },
-    scaling: {
-      targetCount: 0.5,
-      rewards: {
-        exp: 50,
-        gold: 25,
-      },
-    },
-  },
-
-  STORM_CALLER: {
-    id: "storm_caller",
-    name: "Storm Caller",
-    description: "Summon the storm within. Complete 100 burpees in 20 minutes.",
-    baseTargetCount: 100,
-    targetCount: 100,
-    metric: "burpees",
-    timeLimit: 20 * 60 * 1000,
-    rewards: {
-      exp: 600,
-      gold: 300,
-      title: "Thunder Lord",
-    },
-    scaling: {
-      targetCount: 10,
-      rewards: {
-        exp: 75,
-        gold: 35,
-      },
-    },
-  },
-
-  ABYSS_WALKER: {
-    id: "abyss_walker",
-    name: "Abyss Walker",
-    description:
-      "Descend into the depths. Perform 50 pull-ups in a single session.",
-    baseTargetCount: 50,
-    targetCount: 50,
-    metric: "pull-ups",
-    timeLimit: 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 700,
-      gold: 350,
-      title: "Void Strider",
-    },
-    scaling: {
-      targetCount: 5,
-      rewards: {
-        exp: 100,
-        gold: 50,
-      },
-    },
-  },
-
-  FLAME_EMPEROR: {
-    id: "flame_emperor",
-    name: "Flame Emperor",
-    description:
-      "Burn with intensity. Complete 30 minutes of high-intensity interval training (HIIT).",
-    baseTargetCount: 30,
-    targetCount: 30,
-    metric: "minutes",
-    timeLimit: 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 550,
-      gold: 275,
-      title: "Inferno Lord",
-    },
-    scaling: {
-      targetCount: 2,
-      rewards: {
-        exp: 75,
-        gold: 35,
-      },
-    },
-  },
-
-  FROST_GIANT: {
-    id: "frost_giant",
-    name: "Frost Giant",
-    description: "Endure the cold. Swim 1 kilometer in open water or a pool.",
-    baseTargetCount: 1,
-    targetCount: 1,
-    metric: "kilometers",
-    timeLimit: 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 650,
-      gold: 325,
-      title: "Ice Breaker",
-    },
-    scaling: {
-      targetCount: 0.2,
-      rewards: {
-        exp: 75,
-        gold: 35,
-      },
-    },
-  },
-
-  EARTH_SHAKER: {
-    id: "earth_shaker",
-    name: "Earth Shaker",
-    description:
-      "Shake the ground beneath you. Perform 200 squats in a single session.",
-    baseTargetCount: 200,
-    targetCount: 200,
-    metric: "squats",
-    timeLimit: 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 800,
-      gold: 400,
-      title: "Titan of Strength",
-    },
-    scaling: {
-      targetCount: 20,
-      rewards: {
-        exp: 100,
-        gold: 50,
-      },
-    },
-  },
-
-  WIND_RIDER: {
-    id: "wind_rider",
-    name: "Wind Rider",
-    description:
-      "Ride the winds of speed. Cycle 20 kilometers in a single session.",
-    baseTargetCount: 20,
-    targetCount: 20,
-    metric: "kilometers",
-    timeLimit: 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 700,
-      gold: 350,
-      title: "Gale Force",
-    },
-    scaling: {
-      targetCount: 2,
-      rewards: {
-        exp: 100,
-        gold: 50,
-      },
-    },
-  },
-
-  VOID_SEEKER: {
-    id: "void_seeker",
-    name: "Void Seeker",
-    description: "Seek the unknown. Meditate for 30 minutes daily for 7 days.",
-    baseTargetCount: 7,
-    targetCount: 7,
-    metric: "days",
-    timeLimit: 7 * 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 900,
-      gold: 450,
-      title: "Mind of the Void",
-    },
-    scaling: {
-      targetCount: 1,
-      rewards: {
-        exp: 100,
-        gold: 50,
-      },
-    },
-  },
-
-  BLAZE_ARCHER: {
-    id: "blaze_archer",
-    name: "Blaze Archer",
-    description:
-      "Strike with precision. Complete 100 archery shots or similar precision training.",
-    baseTargetCount: 100,
-    targetCount: 100,
-    metric: "shots",
-    timeLimit: 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 600,
-      gold: 300,
-      title: "Eagle Eye",
-    },
-    scaling: {
-      targetCount: 10,
-      rewards: {
-        exp: 75,
-        gold: 35,
-      },
-    },
-  },
-
-  THUNDER_GOD: {
-    id: "thunder_god",
-    name: "Thunder God",
-    description:
-      "Channel the power of thunder. Perform 50 box jumps in 10 minutes.",
-    baseTargetCount: 50,
-    targetCount: 50,
-    metric: "box jumps",
-    timeLimit: 10 * 60 * 1000,
-    rewards: {
-      exp: 650,
-      gold: 325,
-      title: "Storm Bringer",
-    },
-    scaling: {
-      targetCount: 5,
-      rewards: {
-        exp: 75,
-        gold: 35,
-      },
-    },
-  },
-
-  MOONLIGHT_ASSASSIN: {
-    id: "moonlight_assassin",
-    name: "Moonlight Assassin",
-    description:
-      "Move in silence. Complete 30 minutes of yoga or flexibility training.",
-    baseTargetCount: 30,
-    targetCount: 30,
-    metric: "minutes",
-    timeLimit: 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 500,
-      gold: 250,
-      title: "Shadow Dancer",
-    },
-    scaling: {
-      targetCount: 2,
-      rewards: {
-        exp: 50,
-        gold: 25,
-      },
-    },
-  },
-
-  STARGAZER: {
-    id: "stargazer",
-    name: "Stargazer",
-    description:
-      "Reach for the stars. Climb 500 meters on a climbing wall or rock face.",
-    baseTargetCount: 500,
-    targetCount: 500,
-    metric: "meters climbed",
-    timeLimit: 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 800,
-      gold: 400,
-      title: "Celestial Climber",
-    },
-    scaling: {
-      targetCount: 50,
-      rewards: {
-        exp: 100,
-        gold: 50,
-      },
-    },
-  },
-  DRAGON_TAMER: {
-    id: "dragon_tamer",
-    name: "Dragon Tamer",
-    description:
-      "Tame the beast within. Complete 3 consecutive days of intense training.",
-    baseTargetCount: 3,
-    targetCount: 3,
-    metric: "days",
-    timeLimit: 3 * 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 1000,
-      gold: 500,
-      title: "Beast Master",
-    },
-    scaling: {
-      targetCount: 1,
-      rewards: {
-        exp: 150,
-        gold: 75,
-      },
-    },
-  },
-  ETERNAL_GUARDIAN: {
-    id: "eternal_guardian",
-    name: "Eternal Guardian",
-    description: "Protect the realm. Complete 10,000 steps in a single day.",
-    baseTargetCount: 10000,
-    targetCount: 10000,
-    metric: "steps",
-    timeLimit: 24 * 60 * 60 * 1000,
-    rewards: {
-      exp: 700,
-      gold: 350,
-      title: "Guardian of Eternity",
-    },
-    scaling: {
-      targetCount: 500,
-      rewards: {
-        exp: 75,
-        gold: 35,
-      },
-    },
-  },
-};
-  
 
 async function updateBattleProgress(args) {
   if (!isAuthenticated) {
@@ -3404,7 +2137,10 @@ async function updateBattleProgress(args) {
     const endTime = battle.endTime.toDate();
 
     if (now > endTime) {
-      await handleBossBattleTimeout(playerRef, bossId, battle);
+      // Only call handleBossBattleTimeout if battle data is valid
+      if (battle) {
+        await handleBossBattleTimeout(playerRef, bossId, battle);
+      }
       return;
     }
 
@@ -3450,43 +2186,9 @@ async function updateBattleProgress(args) {
 
       // Delete completed battle
       await activeBattleRef.delete();
-
-      printToTerminal(`\n🎉 BOSS DEFEATED: ${boss.name}! 🎉`, "success");
-      printToTerminal(`This was defeat #${defeatCount + 1}!`, "success");
-      printToTerminal(`Rewards earned:`, "reward");
-      printToTerminal(`- ${scaledExp} XP`, "reward");
-      printToTerminal(`- ${scaledGold} Gold`, "reward");
-      printToTerminal(`- New Title: ${boss.rewards.title}`, "reward");
-      printToTerminal(`\nNext time the boss will be stronger:`, "info");
-      printToTerminal(
-        `- Target: +${boss.scaling.targetCount} ${boss.metric}`,
-        "info"
-      );
-      printToTerminal(
-        `- Rewards: +${boss.scaling.rewards.exp} XP, +${boss.scaling.rewards.gold} Gold`,
-        "info"
-      );
-
-      audioSystem.playVoiceLine('BOSS_VICTORY');
-      printToTerminal(`You have defeated ${boss.name}!`, "success");
-      attemptShardDrop();
-    } else {
-      // Update progress
-      await activeBattleRef.update({
-        currentCount: newCount,
-      });
     }
-
-    // Check for level up and achievements
-    await checkLevelUp(playerRef, playerStats.exp);
-    await checkAchievements();
-    updateStatusBar();
-    windowSystem.updateWindowContent("BattleWindow");
   } catch (error) {
-    printToTerminal(
-      "Error updating battle progress: " + error.message,
-      "error"
-    );
+    console.error("Error updating battle progress:", error);
   }
 }
 
@@ -4495,80 +3197,6 @@ const windowSystem = {
 
         dailyQuestsList.appendChild(questElement);
       });
-
-      // Add the CSS if not already present
-      if (!document.getElementById("dailyQuestTimerStyles")) {
-        const styleSheet = document.createElement("style");
-        styleSheet.id = "dailyQuestTimerStyles";
-        styleSheet.textContent = `
-          .daily-timer-section {
-            background: rgba(0, 16, 32, 0.8);
-            border: 1px solid var(--system-blue);
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 20px;
-            text-align: center;
-          }
-          .daily-timer-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
-          }
-          .daily-timer-label {
-            color: var(--system-blue);
-            font-size: 0.9em;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-          }
-          .daily-timer-display {
-            font-size: 2em;
-            font-weight: bold;
-            color: #00ffff;
-            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
-            font-family: monospace;
-          }
-          .daily-timer-progress {
-            width: 100%;
-            height: 8px;
-            background: rgba(0, 136, 255, 0.2);
-            border-radius: 4px;
-            overflow: hidden;
-            position: relative;
-            margin-top: 20px;
-          }
-          .timer-progress-bar {
-            height: 100%;
-            background: linear-gradient(90deg, #0088ff, #00ffff);
-            transition: width 1s linear;
-          }
-          .timer-markers {
-            position: absolute;
-            top: -15px;
-            left: 0;
-            right: 0;
-            height: 20px;
-            pointer-events: none;
-          }
-          .marker {
-            position: absolute;
-            transform: translateX(-50%);
-            font-size: 0.7em;
-            color: var(--system-blue);
-            white-space: nowrap;
-          }
-          .marker::after {
-            content: '';
-            position: absolute;
-            left: 50%;
-            top: 18px;
-            width: 1px;
-            height: 4px;
-            background: var(--system-blue);
-          }
-        `;
-        document.head.appendChild(styleSheet);
-      }
     } catch (error) {
       console.error("Error updating daily quests window:", error);
     }
@@ -6014,7 +4642,8 @@ async function useItem(itemId) {
             "success"
           );
           // Update local playerStats
-          if (!playerStats.profile) playerStats.profile = {};
+          if (!playerStats.profile) playerStats = {};
+          playerStats.profile = playerStats.profile || {};
           playerStats.profile.nameColor = selectedColor;
           // Update all windows that show the player's name
           windowSystem.updateWindowContent("profileWindow");
@@ -7215,28 +5844,40 @@ const BOSS_PENALTIES = {
 // Add function to handle boss battle timeout
 async function handleBossBattleTimeout(playerRef, bossId, battle) {
   try {
+    // Check if penalties have already been applied
+    if (battle && battle.penaltyApplied) {
+      printToTerminal("Penalties have already been applied for this battle.", "warning");
+      return;
+    }
+
     // Apply penalties
-    await playerRef.update({
-      exp: firebase.firestore.FieldValue.increment(BOSS_PENALTIES.exp),
-      gold: firebase.firestore.FieldValue.increment(BOSS_PENALTIES.gold),
-    });
+    if (battle) {
+      await playerRef.update({
+        exp: firebase.firestore.FieldValue.increment(BOSS_PENALTIES.exp),
+        gold: firebase.firestore.FieldValue.increment(BOSS_PENALTIES.gold),
+        [`activeBattles.${bossId}.penaltyApplied`]: true // Mark penalty as applied
+      });
 
-    // Update local stats
-    playerStats.exp = Math.max(0, playerStats.exp + BOSS_PENALTIES.exp);
-    playerStats.gold = Math.max(0, playerStats.gold + BOSS_PENALTIES.gold);
+      // Update local stats
+      playerStats.exp = Math.max(0, playerStats.exp + BOSS_PENALTIES.exp);
+      playerStats.gold = Math.max(0, playerStats.gold + BOSS_PENALTIES.gold);
 
-    // Delete the failed battle
-    await playerRef.collection("activeBattles").doc(bossId).delete();
+      // Delete the failed battle
+      await playerRef.collection("activeBattles").doc(bossId).delete();
 
-    // Show failure message
-    printToTerminal(`\n⚠️ Boss Battle Failed: ${battle.bossName}`, "error");
-    printToTerminal(`Time's up! You've suffered penalties:`, "error");
-    printToTerminal(`${BOSS_PENALTIES.exp} XP`, "error");
-    printToTerminal(`${BOSS_PENALTIES.gold} Gold`, "error");
+      // Retrieve boss name from BOSSES if not available in battle
+      const bossName = battle.bossName || (BOSSES[bossId] ? BOSSES[bossId].name : "Unknown Boss");
 
-    // Update UI
-    updateStatusBar();
-    windowSystem.updateWindowContent("BattleWindow");
+      // Show failure message
+      printToTerminal(`\n⚠️ Boss Battle Failed: ${bossName}`, "error");
+      printToTerminal("Time's up! You've suffered penalties:", "error");
+      printToTerminal(`${BOSS_PENALTIES.exp} XP`, "error");
+      printToTerminal(`${BOSS_PENALTIES.gold} Gold`, "error");
+
+      // Update UI
+      updateStatusBar();
+      windowSystem.updateWindowContent("BattleWindow");
+    }
   } catch (error) {
     console.error("Error handling boss battle timeout:", error);
   }
@@ -7544,7 +6185,7 @@ export class SoloAISystem {
     this.visualizer = null;
     this.speechRecognition = null;
 
-    this.openRouterKey = CONFIG.OPENROUTER_API_KEY;
+    this.openRouterKey = "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";
 
     this.initUI();
     this.initialize();
@@ -7670,6 +6311,29 @@ export class SoloAISystem {
     this.visualizer.setProcessingMode(isProcessing);
   }
 
+  extractQuestDetails(text) {
+    const match = text.match(/create daily quest to (.+) (\d+) (\w+)/i);
+    if (match) {
+      return {
+        type: 'daily',
+        title: match[1],
+        count: parseInt(match[2], 10),
+        metric: match[3],
+        description: `Auto-generated daily quest via AI`,
+      };
+    }
+    return null;
+  }
+  
+  extractWindowId(text) {
+    const windows = Object.keys(windowSystem.windows);
+    return windows.find(id => text.toLowerCase().includes(id.toLowerCase()));
+  }
+  
+  extractBossId(text) {
+    const match = text.match(/start boss battle against (\w+)/i);
+    return match ? match[1] : null;
+  }
   async handleUserInput(text) {
     if (this.processing) return;
   
@@ -7677,16 +6341,63 @@ export class SoloAISystem {
     this.updateProcessingUI(true);
   
     try {
-      this.updateDebug('api', 'Sending request to DeepSeek API via OpenRouter...');
-      let response = await this.callDeepSeekAPI(text);
-      this.updateDebug('api', 'Response received from DeepSeek API');
+      let response;
+      const lowerText = text.toLowerCase();
   
-      response = response.replace(/\*/g, '');
-      // Remove or comment out this duplicate:
-      // this.addMessage('ai', response);
+      // Command handling
+      if (lowerText.includes('create daily quest')) {
+        const questDetails = this.extractQuestDetails(text);
+        if (questDetails) {
+          const questId = await createQuest(questDetails);
+          response = `Daily quest "${questDetails.title}" created successfully!`;
+        } else {
+          response = 'Please specify the quest title, count, and metric (e.g., "Create daily quest to run 5 km").';
+        }
+      } else if (lowerText.includes('open') && lowerText.includes('window')) {
+        const windowId = this.extractWindowId(text);
+        if (windowId && windowSystem.windows[windowId]) {
+          windowSystem.showWindow(windowId);
+          response = `${windowId} window opened.`;
+        } else {
+          response = 'Please specify a valid window to open (e.g., "Open quest window").';
+        }
+      } else if (lowerText.includes('close') && lowerText.includes('window')) {
+        const windowId = this.extractWindowId(text);
+        if (windowId && windowSystem.windows[windowId]) {
+          windowSystem.hideWindow(windowId);
+          response = `${windowId} window closed.`;
+        } else {
+          response = 'Please specify a valid window to close (e.g., "Close quest window").';
+        }
+      } else if (lowerText.includes('start boss battle')) {
+        const bossId = this.extractBossId(text);
+        if (bossId && Object.values(BOSSES).some(b => b.id === bossId)) {
+          await startBossBattle([bossId]);
+          response = `Boss battle against ${bossId} started!`;
+        } else {
+          response = 'Please specify a valid boss ID (e.g., "Start boss battle against step_master").';
+        }
+      } else if (lowerText.includes('show inventory')) {
+        showInventory();
+        response = 'Inventory displayed.';
+      } else if (lowerText.includes('show shop')) {
+        showShop();
+        response = 'Shop opened.';
+      } else if (lowerText.includes('show achievements')) {
+        showAchievements();
+        response = 'Achievements displayed.';
+      } else if (lowerText.includes('show rank progress')) {
+        showRankProgress();
+        response = 'Rank progress displayed.';
+      } else {
+        // Fallback to DeepSeek API for general queries
+        response = await this.callDeepSeekAPI(text);
+      }
+  
+      this.addMessage('ai', response);
       await this.speakResponse(response);
     } catch (error) {
-      this.updateDebug('api', 'Error getting response: ' + error.message);
+      this.updateDebug('api', 'Error processing request: ' + error.message);
       this.addMessage('system', 'Sorry, I encountered an error processing your request.');
     } finally {
       this.updateProcessingUI(false);
@@ -7737,9 +6448,15 @@ export class SoloAISystem {
     const formattedConversation = [];
     formattedConversation.push({
       role: 'system',
-      content: `You are SOLO, an AI assistant for a fitness and well-being app inspired by Solo Leveling. Players can ask you to manage their quests. do not use asterisks in your response. do not use markdown in your response. do not use emojis in your response.`
+      content: `You are SOLO, an AI assistant for a fitness and well-being app inspired by Solo Leveling. You can control the website by:
+      - Creating daily quests (e.g., "Create daily quest to run 5 km")
+      - Opening windows (e.g., "Open quest window")
+      - Closing windows (e.g., "Close quest window")
+      - Starting boss battles (e.g., "Start boss battle against step_master")
+      - Showing inventory, shop, achievements, or rank progress (e.g., "Show inventory")
+      For other queries, provide helpful responses related to fitness and well-being. Do not use asterisks, markdown, or emojis in your responses.`
     });
-
+  
     const recentConversation = this.conversation.slice(-10);
     for (const msg of recentConversation) {
       if (msg.type === 'user') {
@@ -7757,7 +6474,7 @@ export class SoloAISystem {
       const tokenResponse = await fetch(`https://eastus.api.cognitive.microsoft.com/sts/v1.0/issuetoken`, {
         method: 'POST',
         headers: {
-          'Ocp-Apim-Subscription-Key': CONFIG.APIM_SUB_KEY
+          'Ocp-Apim-Subscription-Key': "FANcfK9JLli9bfNboMTIVRIhY3a6BJJf1ifjGP4gUwylRN00Bez0JQQJ99BCACYeBjFXJ3w3AAAYACOG4YgF"
         }
       });
   
@@ -7885,3 +6602,19 @@ window.updateBattleProgress = updateBattleProgress;
 //define other functions here
 
 window.windowSystem = windowSystem;
+
+
+// Function to toggle the terminal display
+function toggleTerminalDisplay() {
+    const terminalContainer = document.querySelector('.terminal-container');
+    if (terminalContainer) {
+      if (terminalContainer.style.display === 'block' || terminalContainer.style.display === '') {
+        terminalContainer.style.display = 'none';
+      } else {
+        terminalContainer.style.display = 'block';
+      }
+    }
+  }
+  
+  // Add event listener to the button
+  document.getElementById('toggleTerminal').addEventListener('click', toggleTerminalDisplay);
