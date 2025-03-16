@@ -26,12 +26,9 @@ const timerSystem = {
   isInitialized: false,
   
   startTimer(id, updateFn, interval = 1000) {
-    // Don't start if already running
     if (this.timers.has(id)) {
-      return this.timers.get(id);
+      this.stopTimer(id); // Clear existing timer
     }
-    
-    // Start new timer
     const timerId = setInterval(updateFn, interval);
     this.timers.set(id, timerId);
     return timerId;
@@ -352,6 +349,8 @@ function showNotificationsWindow() {
 
 // Command Handler
 const commands = {
+  "!switch": toggleTerminalDisplay,
+  "!sw": toggleTerminalDisplay,
   "!commands": showHelp,
   "!c": showHelp,
   "!reawaken": handleReawaken,
@@ -1443,20 +1442,20 @@ window.checkAchievements = async function checkAchievements() {
 
 
 window.getExpNeededForLevel = function getExpNeededForLevel(level) {
-  // Adjusted curve for 6-month progression to level 100
-  // Base XP increases more gradually at lower levels and scales up
   const baseXP = 100;
-  const scalingFactor = 1.08; // Reduced from 1.15 to make progression smoother
+  const linearThreshold = 20; // Levels that follow a linear pattern
+  const scalingFactor = 1.12; // Adjusted for 5-6 months progression
   const maxLevel = 100;
-  
-  // Linear growth for first 20 levels, then exponential
-  if (level <= 20) {
-    return Math.floor(baseXP * (1 + (level - 1) * 0.1));
+
+  // Linear growth for first few levels to ease early progression
+  if (level <= linearThreshold) {
+    return Math.floor(baseXP + (level - 1) * 50);
   }
-  
-  // Exponential growth after level 20
-  return Math.floor(baseXP * Math.pow(scalingFactor, level - 1));
-}
+
+  // Smooth exponential growth after the threshold
+  return Math.floor(baseXP * Math.pow(scalingFactor, level - linearThreshold) + (level * 100));
+};
+
 
 async function checkLevelUp(playerRef, currentExp) {
   let remainingExp = currentExp;
@@ -1513,7 +1512,6 @@ async function checkLevelUp(playerRef, currentExp) {
   }
   return false;
 }
-
 window.completeQuest = async function completeQuest(questId, type) {
   try {
     const playerRef = db.collection("players").doc(currentUser.uid);
@@ -1526,8 +1524,32 @@ window.completeQuest = async function completeQuest(questId, type) {
     // Check if quest was already completed today
     if (type === "daily") {
       const questDoc = await questRef.get();
+      if (!questDoc.exists) {
+        printToTerminal("Quest not found.", "error");
+        return;
+      }
       const quest = questDoc.data();
-      if (quest.completed && wasCompletedToday(quest.lastCompletion)) {
+
+      // Log the raw value of lastCompletion for debugging
+      console.log("Raw lastCompletion:", quest.lastCompletion);
+
+      // Handle different possible formats of lastCompletion
+      let lastCompletionDate;
+      if (quest.lastCompletion) {
+        if (quest.lastCompletion.toDate) {
+          // It's a Firebase Timestamp
+          lastCompletionDate = quest.lastCompletion.toDate();
+        } else if (quest.lastCompletion instanceof Date) {
+          // It's already a Date object
+          lastCompletionDate = quest.lastCompletion;
+        } else {
+          // Unexpected format, log and assume not completed
+          console.warn("Unexpected lastCompletion format:", quest.lastCompletion);
+          lastCompletionDate = null;
+        }
+      }
+
+      if (quest.completed && lastCompletionDate && wasCompletedToday(lastCompletionDate)) {
         printToTerminal("This daily quest was already completed today!", "warning");
         return;
       }
@@ -1538,7 +1560,10 @@ window.completeQuest = async function completeQuest(questId, type) {
 
     await db.runTransaction(async (transaction) => {
       const playerDoc = await transaction.get(playerRef);
-      if (!playerDoc.exists) return;
+      if (!playerDoc.exists) {
+        printToTerminal("Player data not found.", "error");
+        return;
+      }
 
       const player = playerDoc.data();
 
@@ -1561,26 +1586,29 @@ window.completeQuest = async function completeQuest(questId, type) {
       const updates = {
         exp: firebase.firestore.FieldValue.increment(finalExpReward),
         gold: firebase.firestore.FieldValue.increment(finalGoldReward),
-        questsCompleted: firebase.firestore.FieldValue.increment(1)
+        questsCompleted: firebase.firestore.FieldValue.increment(1),
       };
 
       // Handle daily streak
       if (type === "daily") {
-        const isNextDay = !wasCompletedToday(player.lastDailyCompletion?.toDate());
+        const lastDailyCompletion = player.lastDailyCompletion?.toDate
+          ? player.lastDailyCompletion.toDate()
+          : null;
+        const isNextDay = !lastDailyCompletion || !wasCompletedToday(lastDailyCompletion);
         if (isNextDay) {
           updates.streak = firebase.firestore.FieldValue.increment(1);
           updates.lastDailyCompletion = firebase.firestore.FieldValue.serverTimestamp();
         }
       }
 
-      // Apply updates
+      // Apply updates to player
       transaction.update(playerRef, updates);
 
       // Update quest status
       if (type === "daily") {
         transaction.update(questRef, {
           completed: true,
-          lastCompletion: firebase.firestore.FieldValue.serverTimestamp()
+          lastCompletion: firebase.firestore.FieldValue.serverTimestamp(),
         });
       } else {
         transaction.delete(questRef);
@@ -1601,7 +1629,7 @@ window.completeQuest = async function completeQuest(questId, type) {
     await checkAchievements();
 
     // Show completion message
-    audioSystem.playVoiceLine('QUEST_COMPLETE');
+    audioSystem.playVoiceLine("QUEST_COMPLETE");
     const questMessage = getRandomItem(MOTIVATION.MILESTONE_MESSAGES.QUEST_COMPLETE);
     printToTerminal(`\n${questMessage}`, "system");
     printToTerminal(`Quest completed successfully!`, "success");
@@ -1611,12 +1639,13 @@ window.completeQuest = async function completeQuest(questId, type) {
     windowSystem.updateWindowContent(type === "daily" ? "dailyQuestsWindow" : "questsWindow");
     windowSystem.updateWindowContent("achievementsWindow");
     windowSystem.updateWindowContent("profileWindow");
-
   } catch (error) {
     printToTerminal("Error completing quest: " + error.message, "error");
     console.error("Complete quest error:", error);
   }
-}
+};
+
+
 
 // Shadow Army System
 window.SHADOW_TIERS = {
@@ -1773,21 +1802,31 @@ window.updateQuestProgress = async function updateQuestProgress(questId, type, a
     printToTerminal("Error updating quest progress: " + error.message, "error");
   }
 }
+function wasCompletedToday(dateInput) {
+  if (!dateInput) return false;
 
-// Add this function to check if a quest was completed today
-function wasCompletedToday(lastCompletion) {
-  if (!lastCompletion) return false;
+  let completionDate;
+  if (dateInput.toDate) {
+    // Firebase Timestamp
+    completionDate = dateInput.toDate();
+  } else if (dateInput instanceof Date) {
+    // Already a Date object
+    completionDate = dateInput;
+  } else {
+    // Invalid input, assume not completed today
+    console.warn("Invalid date input for wasCompletedToday:", dateInput);
+    return false;
+  }
 
-  const completionDate = lastCompletion.toDate();
   const now = new Date();
-
   return (
     completionDate.getDate() === now.getDate() &&
     completionDate.getMonth() === now.getMonth() &&
-    completionDate.getYear() === now.getYear()
+    completionDate.getFullYear() === now.getFullYear()
   );
 }
 
+window.wasCompletedToday = wasCompletedToday; // Make globally available if needed
 window.sellShard = async function sellShard(shardId, quantity) {
   if (!isAuthenticated) {
     printToTerminal("You must !reawaken first.", "error");
@@ -5111,10 +5150,18 @@ async function handlePenaltyCommand() {
     printToTerminal("\nChecking daily quests for penalties...", "system");
     const now = firebase.firestore.Timestamp.now();
     const yesterday = new Date(now.toMillis() - 24 * 60 * 60 * 1000);
-
     const playerRef = db.collection("players").doc(currentUser.uid);
-    const dailyQuestsSnapshot = await playerRef.collection("dailyQuests").get();
 
+    // Check if penalty was already applied today
+    const playerDoc = await playerRef.get();
+    const player = playerDoc.data();
+    const lastPenalty = player.lastPenalty?.toDate();
+    if (lastPenalty && (now.toDate() - lastPenalty) < 24 * 60 * 60 * 1000) {
+      printToTerminal("Penalty already applied today.", "warning");
+      return;
+    }
+
+    const dailyQuestsSnapshot = await playerRef.collection("dailyQuests").get();
     let incompleteQuests = 0;
     const totalQuests = dailyQuestsSnapshot.size;
     printToTerminal(`Found ${totalQuests} total daily quests`, "info");
@@ -5122,8 +5169,7 @@ async function handlePenaltyCommand() {
     dailyQuestsSnapshot.forEach((questDoc) => {
       const quest = questDoc.data();
       const lastCompletion = quest.lastCompletion ? quest.lastCompletion.toDate() : null;
-      
-      if (!quest.lastCompletion || quest.lastCompletion.toDate() < yesterday) {
+      if (!lastCompletion || lastCompletion < yesterday) {
         incompleteQuests++;
       }
     });
@@ -5135,16 +5181,11 @@ async function handlePenaltyCommand() {
       const basePenalty = 50;
       const incompletionRate = incompleteQuests / totalQuests;
       let multiplier = 1;
-
       if (incompletionRate > 0.5) multiplier = 1.5;
       if (incompletionRate > 0.75) multiplier = 2;
       if (incompletionRate === 1) multiplier = 2.5;
 
       const penaltyAmount = Math.round(basePenalty * incompleteQuests * multiplier);
-
-      // Get current player stats
-      const playerDoc = await playerRef.get();
-      const player = playerDoc.data();
       const currentExp = player.exp || 0;
       const currentLevel = player.level || 1;
 
@@ -5152,21 +5193,12 @@ async function handlePenaltyCommand() {
       let newExp = currentExp - penaltyAmount;
       let newLevel = currentLevel;
 
-      // Ensure exp doesn't go below 100
-      if (newExp < 100) {
-        newExp = 100;
-      }
-
-      // If exp goes negative, reduce levels and add the correct exp for each level
+      if (newExp < 100) newExp = 100; // Minimum exp
       while (newExp < 0 && newLevel > 1) {
         newLevel--;
         newExp += getExpNeededForLevel(newLevel);
       }
-
-      // Ensure exp doesn't go below 0 at level 1
-      if (newLevel === 1 && newExp < 0) {
-        newExp = 0;
-      }
+      if (newLevel === 1 && newExp < 0) newExp = 0;
 
       const levelsLost = currentLevel - newLevel;
 
@@ -5177,6 +5209,10 @@ async function handlePenaltyCommand() {
         lastPenalty: now,
         lastPenaltyAmount: penaltyAmount,
       });
+
+      // Update local stats
+      playerStats.exp = newExp;
+      playerStats.level = newLevel;
 
       // Create penalty log
       await db.collection("penaltyLogs").add({
@@ -5207,16 +5243,15 @@ async function handlePenaltyCommand() {
           expLost: currentExp - newExp,
           levelsLost,
           previousLevel: currentLevel,
-          newLevel
-        }
+          newLevel,
+        },
       });
 
+      // Display penalty details
       printToTerminal("\n=== PENALTY APPLIED ===", "error");
       printToTerminal(`Failed Quests: ${incompleteQuests}/${totalQuests}`, "error");
       printToTerminal(`XP Lost: ${penaltyAmount}`, "error");
-      if (levelsLost > 0) {
-        printToTerminal(`Levels Lost: ${levelsLost}`, "error");
-      }
+      if (levelsLost > 0) printToTerminal(`Levels Lost: ${levelsLost}`, "error");
       printToTerminal(`Previous Level: ${currentLevel}`, "info");
       printToTerminal(`New Level: ${newLevel}`, "info");
       printToTerminal(`Previous EXP: ${currentExp}`, "info");
@@ -5228,7 +5263,6 @@ async function handlePenaltyCommand() {
       windowSystem.updateWindowContent("notificationsWindow");
 
       audioSystem.playVoiceLine('PENALTY');
-      printToTerminal("\n=== PENALTY APPLIED ===", "error");
     } else {
       printToTerminal("No penalties needed - all quests are complete!", "success");
     }
@@ -5237,6 +5271,8 @@ async function handlePenaltyCommand() {
     printToTerminal("Error checking penalties: " + error.message, "error");
   }
 }
+
+commands["!penalty"] = handlePenaltyCommand; // Register command
 
 // Add delete quest function
 async function deleteQuest(questId, type) {
@@ -5840,32 +5876,43 @@ const BOSS_PENALTIES = {
   exp: -100,
   gold: -50,
 };
-
-// Add function to handle boss battle timeout
-async function handleBossBattleTimeout(playerRef, bossId, battle) {
+async function handleBossBattleTimeout(playerRef, bossId) {
   try {
-    // Check if penalties have already been applied
-    if (battle && battle.penaltyApplied) {
-      printToTerminal("Penalties have already been applied for this battle.", "warning");
-      return;
-    }
+    await db.runTransaction(async (transaction) => {
+      const battleRef = playerRef.collection("activeBattles").doc(bossId);
+      const battleDoc = await transaction.get(battleRef);
 
-    // Apply penalties
-    if (battle) {
-      await playerRef.update({
-        exp: firebase.firestore.FieldValue.increment(BOSS_PENALTIES.exp),
-        gold: firebase.firestore.FieldValue.increment(BOSS_PENALTIES.gold),
-        [`activeBattles.${bossId}.penaltyApplied`]: true // Mark penalty as applied
+      // Check if battle exists and penalties haven't been applied
+      if (!battleDoc.exists) {
+        printToTerminal(`No active battle found for boss ${bossId}.`, "warning");
+        return;
+      }
+
+      const battle = battleDoc.data();
+      if (battle.penaltyApplied) {
+        printToTerminal("Penalties have already been applied for this battle.", "warning");
+        return;
+      }
+
+      // Apply penalties to player stats
+      const updatedExp = Math.max(0, playerStats.exp + BOSS_PENALTIES.exp);
+      const updatedGold = Math.max(0, playerStats.gold + BOSS_PENALTIES.gold);
+
+      // Update player stats in transaction
+      transaction.update(playerRef, {
+        exp: updatedExp,
+        gold: updatedGold,
       });
 
+      // Mark penalty as applied and delete the battle
+      transaction.update(battleRef, { penaltyApplied: true });
+      transaction.delete(battleRef);
+
       // Update local stats
-      playerStats.exp = Math.max(0, playerStats.exp + BOSS_PENALTIES.exp);
-      playerStats.gold = Math.max(0, playerStats.gold + BOSS_PENALTIES.gold);
+      playerStats.exp = updatedExp;
+      playerStats.gold = updatedGold;
 
-      // Delete the failed battle
-      await playerRef.collection("activeBattles").doc(bossId).delete();
-
-      // Retrieve boss name from BOSSES if not available in battle
+      // Retrieve boss name (fallback to BOSSES if not in battle data)
       const bossName = battle.bossName || (BOSSES[bossId] ? BOSSES[bossId].name : "Unknown Boss");
 
       // Show failure message
@@ -5877,11 +5924,14 @@ async function handleBossBattleTimeout(playerRef, bossId, battle) {
       // Update UI
       updateStatusBar();
       windowSystem.updateWindowContent("BattleWindow");
-    }
+    });
   } catch (error) {
     console.error("Error handling boss battle timeout:", error);
+    printToTerminal("Error processing battle timeout: " + error.message, "error");
   }
 }
+
+window.handleBossBattleTimeout = handleBossBattleTimeout; // Make globally available if needed
 
 async function startBossBattle(args) {
   if (!isAuthenticated) {
