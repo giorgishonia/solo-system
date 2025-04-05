@@ -85,6 +85,125 @@ const ACHIEVEMENTS = {
       type: "total_gold",
       icon: "💎",
     },
+
+     // Combat Achievements
+  BATTLE_VETERAN: {
+    id: "battle_veteran",
+    name: "Battle Veteran",
+    description: "Win battles",
+    ranks: [
+      { rank: 1, requirement: 10, reward: { exp: 100, gold: 50 } },
+      { rank: 2, requirement: 50, reward: { exp: 300, gold: 150 } },
+      { rank: 3, requirement: 100, reward: { exp: 500, gold: 250 } },
+      { rank: 4, requirement: 250, reward: { exp: 1000, gold: 500 } },
+      { rank: 5, requirement: 500, reward: { exp: 2000, gold: 1000 } },
+    ],
+    currentRank: 0,
+    type: "battles_won",
+    icon: "⚔️",
+  },
+
+  // Exploration Achievements
+  WORLD_EXPLORER: {
+    id: "world_explorer",
+    name: "World Explorer",
+    description: "Discover new locations",
+    ranks: [
+      { rank: 1, requirement: 5, reward: { exp: 100, gold: 50 } },
+      { rank: 2, requirement: 10, reward: { exp: 200, gold: 100 } },
+      { rank: 3, requirement: 20, reward: { exp: 400, gold: 200 } },
+      { rank: 4, requirement: 35, reward: { exp: 600, gold: 300 } },
+      { rank: 5, requirement: 50, reward: { exp: 1000, gold: 500 } },
+    ],
+    currentRank: 0,
+    type: "locations_discovered",
+    icon: "🗺️",
+  },
+
+  // Crafting Achievements
+  MASTER_CRAFTSMAN: {
+    id: "master_craftsman",
+    name: "Master Craftsman",
+    description: "Craft items",
+    ranks: [
+      { rank: 1, requirement: 10, reward: { exp: 100, gold: 50 } },
+      { rank: 2, requirement: 25, reward: { exp: 200, gold: 100 } },
+      { rank: 3, requirement: 50, reward: { exp: 400, gold: 200 } },
+      { rank: 4, requirement: 100, reward: { exp: 600, gold: 300 } },
+      { rank: 5, requirement: 200, reward: { exp: 1000, gold: 500 } },
+    ],
+    currentRank: 0,
+    type: "items_crafted",
+    icon: "🛠️",
+  },
+
+  // Social Achievements
+  FRIENDLY_NEIGHBOR: {
+    id: "friendly_neighbor",
+    name: "Friendly Neighbor",
+    description: "Make friends",
+    ranks: [
+      { rank: 1, requirement: 5, reward: { exp: 100, gold: 50 } },
+      { rank: 2, requirement: 10, reward: { exp: 200, gold: 100 } },
+      { rank: 3, requirement: 20, reward: { exp: 400, gold: 200 } },
+      { rank: 4, requirement: 35, reward: { exp: 600, gold: 300 } },
+      { rank: 5, requirement: 50, reward: { exp: 1000, gold: 500 } },
+    ],
+    currentRank: 0,
+    type: "friends_added",
+    icon: "🤝",
+  },
+
+  // Collection Achievements
+  COLLECTOR_EXTRAORDINAIRE: {
+    id: "collector_extraordinaire",
+    name: "Collector Extraordinaire",
+    description: "Collect rare items",
+    ranks: [
+      { rank: 1, requirement: 5, reward: { exp: 100, gold: 50 } },
+      { rank: 2, requirement: 10, reward: { exp: 200, gold: 100 } },
+      { rank: 3, requirement: 20, reward: { exp: 400, gold: 200 } },
+      { rank: 4, requirement: 35, reward: { exp: 600, gold: 300 } },
+      { rank: 5, requirement: 50, reward: { exp: 1000, gold: 500 } },
+    ],
+    currentRank: 0,
+    type: "rare_items_collected",
+    icon: "📦",
+  },
+
+  // Time-Based Achievements
+  EARLY_BIRD: {
+    id: "early_bird",
+    name: "Early Bird",
+    description: "Log in early in the morning",
+    ranks: [
+      { rank: 1, requirement: 1, reward: { exp: 50, gold: 25 } },
+      { rank: 2, requirement: 5, reward: { exp: 100, gold: 50 } },
+      { rank: 3, requirement: 10, reward: { exp: 200, gold: 100 } },
+      { rank: 4, requirement: 20, reward: { exp: 400, gold: 200 } },
+      { rank: 5, requirement: 30, reward: { exp: 800, gold: 400 } },
+    ],
+    currentRank: 0,
+    type: "early_logins",
+    icon: "🌅",
+  },
+
+  // Challenge Achievements
+  CHALLENGE_CHAMPION: {
+    id: "challenge_champion",
+    name: "Challenge Champion",
+    description: "Complete challenges",
+    ranks: [
+      { rank: 1, requirement: 5, reward: { exp: 100, gold: 50 } },
+      { rank: 2, requirement: 10, reward: { exp: 200, gold: 100 } },
+      { rank: 3, requirement: 20, reward: { exp: 400, gold: 200 } },
+      { rank: 4, requirement: 35, reward: { exp: 600, gold: 300 } },
+      { rank: 5, requirement: 50, reward: { exp: 1000, gold: 500 } },
+    ],
+    currentRank: 0,
+    type: "challenges_completed",
+    icon: "🏆",
+  },
   
     // Rank Achievements
     RANK_MASTER: {
@@ -102,38 +221,6 @@ const ACHIEVEMENTS = {
       type: "rank",
       icon: "👑",
     },
-  
-    // Shadow Army Achievements
-    SHADOW_MASTER: {
-      id: "shadow_master",
-      name: "Shadow Master",
-      description: "Build your shadow army",
-      ranks: [
-        { rank: 1, requirement: 1, reward: { exp: 100, gold: 50 }, description: "Extract your first shadow" },
-        { rank: 2, requirement: 5, reward: { exp: 200, gold: 100 }, description: "Have 5 shadows" },
-        { rank: 3, requirement: 10, reward: { exp: 300, gold: 150 }, description: "Have 10 shadows" },
-        { rank: 4, requirement: 25, reward: { exp: 400, gold: 200 }, description: "Have 25 shadows" },
-        { rank: 5, requirement: 50, reward: { exp: 500, gold: 250 }, description: "Have 50 shadows" }
-      ],
-      currentRank: 0,
-      type: "shadow_count",
-      icon: "👻"
-    },
-    SHADOW_EVOLUTION: {
-      id: "shadow_evolution",
-      name: "Shadow Evolution",
-      description: "Upgrade your shadows to higher tiers",
-      ranks: [
-        { rank: 1, requirement: 1, reward: { exp: 200, gold: 100 }, description: "Have 1 Elite Shadow" },
-        { rank: 2, requirement: 1, reward: { exp: 400, gold: 200 }, description: "Have 1 Shadow General" },
-        { rank: 3, requirement: 1, reward: { exp: 600, gold: 300 }, description: "Have 1 Shadow Monarch" },
-        { rank: 4, requirement: 3, reward: { exp: 800, gold: 400 }, description: "Have 3 Shadow Monarchs" },
-        { rank: 5, requirement: 5, reward: { exp: 1000, gold: 500 }, description: "Have 5 Shadow Monarchs" }
-      ],
-      currentRank: 0,
-      type: "shadow_tier",
-      icon: "👑"
-    }
   };
 
   export default ACHIEVEMENTS;

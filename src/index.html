@@ -1,0 +1,276 @@
+<!-- Simplified Fitness Tracker Window -->
+<div id="fitnessWindow" class="window" style="width: 600px; height: 650px; display: none;">
+  <div class="window-header">
+    <div class="window-title">Fitness Tracker</div>
+    <div class="window-controls">
+      <button class="window-minimize">-</button>
+      <button class="window-close">×</button>
+    </div>
+  </div>
+  <div class="window-content">
+    <div class="fitness-dashboard">
+      <div class="fitness-tabs">
+        <button id="overviewTabBtn" class="fitness-tab active">Overview</button>
+        <button id="goalsTabBtn" class="fitness-tab">Goals</button>
+        <button id="logWorkoutTabBtn" class="fitness-tab">Log Workout</button>
+      </div>
+
+      <!-- Overview Tab -->
+      <div id="overviewTab" class="fitness-tab-content active">
+        <!-- Summary Section -->
+        <div class="fitness-section">
+          <h3>Weekly Summary</h3>
+          <div class="fitness-summary">
+            <div class="fitness-stat">
+              <div class="fitness-stat-title">Active Days</div>
+              <div class="fitness-stat-value" id="activeDaysCount">0/7</div>
+            </div>
+            <div class="fitness-stat">
+              <div class="fitness-stat-title">Calories Burned</div>
+              <div class="fitness-stat-value" id="caloriesBurned">0</div>
+            </div>
+            <div class="fitness-stat">
+              <div class="fitness-stat-title">Workout Time</div>
+              <div class="fitness-stat-value" id="workoutTime">0 mins</div>
+            </div>
+            <div class="fitness-stat">
+              <div class="fitness-stat-title">Workouts</div>
+              <div class="fitness-stat-value" id="workoutCount">0</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Monthly Stats -->
+        <div class="fitness-section">
+          <h3>Monthly Statistics</h3>
+          <div class="fitness-summary">
+            <div class="fitness-stat">
+              <div class="fitness-stat-title">Month</div>
+              <div class="fitness-stat-value" id="currentMonth">Mar 2023</div>
+            </div>
+            <div class="fitness-stat">
+              <div class="fitness-stat-title">Active Days</div>
+              <div class="fitness-stat-value" id="monthlyActiveDays">0</div>
+            </div>
+            <div class="fitness-stat">
+              <div class="fitness-stat-title">Total Time</div>
+              <div class="fitness-stat-value" id="monthlyTime">0 mins</div>
+            </div>
+            <div class="fitness-stat">
+              <div class="fitness-stat-title">Calories</div>
+              <div class="fitness-stat-value" id="monthlyCalories">0</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Recent Workouts -->
+        <div class="fitness-section">
+          <h3>Recent Workouts</h3>
+          <div class="recent-workouts-list" id="recentWorkoutsList">
+            <!-- Will be populated dynamically -->
+            <div class="empty-list-message">No recent workouts</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Goals Tab -->
+      <div id="goalsTab" class="fitness-tab-content">
+        <div class="fitness-section">
+          <h3>Weekly Goals</h3>
+          <div class="goals-list" id="weeklyGoalsList">
+            <!-- Weekly goals will be displayed here -->
+          </div>
+        </div>
+        
+        <div class="fitness-section">
+          <h3>Custom Goals</h3>
+          <div class="goals-list" id="customGoalsList">
+            <!-- Custom goals will be displayed here -->
+          </div>
+        </div>
+        
+        <div class="fitness-actions">
+          <button class="window-button" id="manageGoalsBtn">Manage Goals</button>
+        </div>
+      </div>
+
+      <!-- Log Workout Tab -->
+      <div id="logWorkoutTab" class="fitness-tab-content">
+        <div class="workout-form">
+          <div class="form-group">
+            <label for="workoutType">Workout Type</label>
+            <input type="text" id="workoutType" class="form-control" placeholder="Type your workout name...">
+          </div>
+          <div class="form-group">
+            <label for="workoutDuration">Duration (minutes)</label>
+            <input type="number" id="workoutDuration" class="form-control" min="1" value="30">
+          </div>
+          <div class="form-group">
+            <label for="workoutIntensity">Intensity</label>
+            <select id="workoutIntensity" class="form-control">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="caloriesBurnedInput">Calories Burned (estimated)</label>
+            <input type="number" id="caloriesBurnedInput" class="form-control" readonly>
+          </div>
+          <div class="form-group">
+            <label for="workoutNotes">Notes (optional)</label>
+            <textarea id="workoutNotes" class="form-control" rows="3"></textarea>
+          </div>
+          <div class="form-actions">
+            <button class="window-button" id="saveWorkoutBtn">Save Workout</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="goalsManagerWindow" class="window" style="width: 450px; height: 600px; display: none;">
+  <div class="window-header">
+    <div class="window-title">Fitness Goals Manager</div>
+    <div class="window-controls">
+      <button class="window-minimize">-</button>
+      <button class="window-close">×</button>
+    </div>
+  </div>
+  <div class="window-content">
+    <div class="goals-manager">
+      <div class="goals-section">
+        <h3>Weekly Goals</h3>
+        <div class="weekly-goals-form">
+          <div class="goal-input-group">
+            <label for="weeklyMinutesGoal">Activity Minutes:</label>
+            <input type="number" id="weeklyMinutesGoal" min="0" step="5">
+            <span class="goal-unit">minutes/week</span>
+          </div>
+          <div class="goal-input-group">
+            <label for="weeklyCaloriesGoal">Calories Burned:</label>
+            <input type="number" id="weeklyCaloriesGoal" min="0" step="50">
+            <span class="goal-unit">calories/week</span>
+          </div>
+          <div class="goal-input-group">
+            <label for="weeklyWorkoutsGoal">Workout Count:</label>
+            <input type="number" id="weeklyWorkoutsGoal" min="0" step="1">
+            <span class="goal-unit">workouts/week</span>
+          </div>
+          <div class="goal-input-group">
+            <label for="weeklyActiveDaysGoal">Active Days:</label>
+            <input type="number" id="weeklyActiveDaysGoal" min="0" max="7" step="1">
+            <span class="goal-unit">days/week</span>
+          </div>
+          <div class="goals-actions">
+            <button id="saveWeeklyGoalsBtn" class="action-button">Save Weekly Goals</button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="goals-section">
+        <h3>Custom Goals</h3>
+        <div id="customGoalsManagerList" class="custom-goals-list">
+          <!-- Custom goals will be added here dynamically -->
+        </div>
+        
+        <div class="add-goal-form">
+          <h4>Add New Goal</h4>
+          <div class="goal-input-group">
+            <label for="goalName">Goal Name:</label>
+            <input type="text" id="goalName" placeholder="e.g., Summer Training">
+          </div>
+          <div class="goal-input-group">
+            <label for="goalType">Type:</label>
+            <select id="goalType">
+              <option value="minutesActive">Minutes Active</option>
+              <option value="caloriesBurned">Calories Burned</option>
+              <option value="workoutCount">Workout Count</option>
+              <option value="activeDays">Active Days</option>
+            </select>
+          </div>
+          <div class="goal-input-group">
+            <label for="goalTarget">Target:</label>
+            <input type="number" id="goalTarget" min="0">
+            <span id="goalUnit" class="goal-unit">minutes</span>
+          </div>
+          <div class="goal-input-group">
+            <label for="goalPeriod">Time Period:</label>
+            <select id="goalPeriod">
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="custom">Custom Date Range</option>
+            </select>
+          </div>
+          <div class="goal-input-group">
+            <label for="goalStartDate">Start Date:</label>
+            <input type="date" id="goalStartDate">
+          </div>
+          <div class="goal-input-group">
+            <label for="goalEndDate">End Date:</label>
+            <input type="date" id="goalEndDate">
+          </div>
+          <div class="goal-input-group">
+            <label for="goalDescription">Description:</label>
+            <textarea id="goalDescription" placeholder="Optional description of your goal"></textarea>
+          </div>
+          <div class="goals-actions">
+            <button id="addCustomGoalBtn" class="action-button">Add Goal</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Workout Chat Window for AI fitness tracking -->
+<div id="workoutChatWindow" class="window" style="width: 500px; height: 600px; display: none;">
+  <div class="window-header">
+    <div class="window-title">Workout Chat</div>
+    <div class="window-controls">
+      <button class="window-minimize">-</button>
+      <button class="window-close">×</button>
+    </div>
+  </div>
+  <div class="window-content">
+    <div class="workout-chat-container">
+      <!-- Chat history will appear here -->
+      <div id="workoutChatHistory" class="workout-chat-history"></div>
+      
+      <!-- Chat input area -->
+      <div class="workout-chat-input-container">
+        <textarea id="workoutChatInput" class="workout-chat-input" placeholder="Tell AI about your workout (e.g., 'I ran for 30 minutes and did 50 pushups')"></textarea>
+        <button id="workoutChatSendBtn" class="window-button">Send</button>
+      </div>
+      
+      <!-- User stats info that will be sent to AI -->
+      <div class="workout-user-stats" style="font-size: 12px; color: #666; margin-top: 10px;">
+        <div>Your profile stats will be used to calculate calories burned.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="notesWindow" class="window">
+  <div class="window-header">
+    <div class="window-title">Notes</div>
+    <button class="window-close">×</button>
+  </div>
+  <div class="window-content">
+    <div class="notes-toolbar">
+      <button class="window-button" onclick="noteManager.createNote()">
+        <i class="fas fa-plus"></i> New Note
+      </button>
+      <button class="window-button" onclick="noteManager.showAllNotes()">
+        <i class="fas fa-eye"></i> Show All
+      </button>
+      <button class="window-button" onclick="noteManager.hideAllNotes()">
+        <i class="fas fa-eye-slash"></i> Hide All
+      </button>
+    </div>
+    <div id="notesList" class="notes-list">
+      <!-- Notes will be populated here -->
+    </div>
+  </div>
+</div> 

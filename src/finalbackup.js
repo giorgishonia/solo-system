@@ -5,12 +5,18 @@ import ACHIEVEMENTS from './achievements.js';
 import { showProfile } from './profile.js';
 import { showInventory } from './inventory.js';
 import { showHelp } from './commands.js';
-window.ITEMS = ITEMS;
 
+const firebaseConfig = {
+  apiKey: "AIzaSyAEpfs-P81k4vagCAPlrW_qOXEysllMjGg",
+  authDomain: "reawakening-fe981.firebaseapp.com",
+  projectId: "reawakening-fe981",
+  storageBucket: "reawakening-fe981.appspot.com",
+  messagingSenderId: "310750239922",
+  appId: "1:310750239922:web:cdfb7c87f2e05c52553dab",
+  measurementId: "G-WLY0K1N1TG",
+};
 
-import CONFIG from './config.js';
-
-firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
+firebase.initializeApp(firebaseConfig);
 export const auth = firebase.auth();
 const db = firebase.firestore();
 
@@ -239,17 +245,10 @@ const output = document.getElementById("output");
 const input = document.getElementById("input");
 const notification = document.getElementById("notification");
 
-window.updateTerminalPrompt = function updateTerminalPrompt() {
+// Terminal Prompt Update
+window.updateTerminalPrompt =  function updateTerminalPrompt() {
   const prompt = document.querySelector(".terminal-prompt-user");
   if (prompt) {
-    // If streak >= 3, our updateUsernameDisplays will handle it
-    const streakCount = playerStats.streak || 0;
-    if (streakCount >= 3) {
-      updateUsernameDisplays();
-      return;
-    }
-    
-    // Otherwise use the original logic
     let displayName = playerStats.profile?.name || "PLAYER";
     if (playerStats.profile?.title) {
       displayName = `[${playerStats.profile.title}] ${displayName}`;
@@ -263,6 +262,7 @@ window.updateTerminalPrompt = function updateTerminalPrompt() {
     prompt.textContent = displayName;
   }
 }
+
 // Shop system
 window.showShop = async function showShop() {
   if (!isAuthenticated) {
@@ -602,68 +602,34 @@ window.handleQuestCreation = async function handleQuestCreation(value) {
     questCreationState = {};
   }
 }
+
 window.createQuest = async function createQuest(quest) {
-  try {
-    if (!currentUser || !currentUser.uid) throw new Error("User not authenticated.");
-    
-    // Validate and fix quest data before saving
-    if (!quest.title) {
-      quest.title = "New Quest";
+    try {
+      if (!currentUser || !currentUser.uid) throw new Error("User not authenticated.");
+      const questRef = db.collection("players").doc(currentUser.uid)
+        .collection(quest.type === "daily" ? "dailyQuests" : "quests");
+      const questData = {
+        title: quest.title,
+        targetCount: quest.count,
+        currentCount: 0,
+        metric: quest.metric,
+        description: quest.description,
+        type: quest.type,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        completed: false,
+        ...(quest.type === "daily" ? { lastReset: firebase.firestore.FieldValue.serverTimestamp() } : {})
+      };
+      const docRef = await questRef.add(questData);
+      printToTerminal(`${quest.type === "daily" ? "Daily quest" : "Quest"} created successfully!`, "success");
+      showNotification("Quest created!");
+      windowSystem.updateWindowContent("questsWindow");
+      windowSystem.updateWindowContent("dailyQuestsWindow");
+      return docRef.id;
+    } catch (error) {
+      printToTerminal("Error creating quest: " + error.message, "error");
+      console.error("Error details:", error);
     }
-    
-    // Make sure targetCount is a valid number
-    let targetCount = parseInt(quest.targetCount);
-    if (isNaN(targetCount) || targetCount <= 0) {
-      targetCount = 5; // Default to 5 if invalid
-    }
-    
-    if (!quest.metric) {
-      quest.metric = "times";
-    }
-    
-    if (!quest.description) {
-      quest.description = "Complete this quest";
-    }
-    
-    // Create validated quest data
-    const questData = {
-      title: quest.title,
-      targetCount: targetCount, // Use validated number
-      currentCount: 0,
-      metric: quest.metric,
-      description: quest.description,
-      type: quest.type || "normal",
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      completed: false,
-      ...(quest.type === "daily" ? { lastReset: firebase.firestore.FieldValue.serverTimestamp() } : {})
-    };
-    
-    // Log the quest data for debugging
-    console.log("Creating quest with data:", questData);
-    
-    // Save to the appropriate collection
-    const questsCollection = quest.type === "daily" ? "dailyQuests" : "quests";
-    const questRef = db.collection("players").doc(currentUser.uid).collection(questsCollection);
-    const docRef = await questRef.add(questData);
-    
-    printToTerminal(`${quest.type === "daily" ? "Daily quest" : "Quest"} created successfully!`, "success");
-    showNotification("Quest created!");
-    
-    if (windowSystem) {
-      if (quest.type === "daily") {
-        windowSystem.updateWindowContent("dailyQuestsWindow");
-      } else {
-        windowSystem.updateWindowContent("questsWindow");
-      }
-    }
-    
-    return docRef.id;
-  } catch (error) {
-    printToTerminal("Error creating quest: " + error.message, "error");
-    console.error("Error details:", error);
-    throw error; // Rethrow to allow handling upstream
-  }
-};
+  };
 
 window.showQuestWindow = async function showQuestWindow(type = "normal") {
   try {
@@ -884,8 +850,6 @@ window.initializePlayer = async function initializePlayer() {
     const playerRef = db.collection("players").doc(currentUser.uid);
     const doc = await playerRef.get();
 
-    addStreakUsernameStyles();
-
     if (doc.exists) {
       playerStats = doc.data();
       // Ensure expNeeded is set if missing or outdated
@@ -942,7 +906,7 @@ window.initializePlayer = async function initializePlayer() {
         }
       }
     });
-    updateUsernameDisplays();
+
     updateTerminalPrompt();
     updateStatusBar(); 
   } catch (error) {
@@ -987,7 +951,6 @@ window.updateStatusBar = function updateStatusBar() {
       <span class="sl-status-label">GOLD</span>
     </div>
   `;
-  updateUsernameDisplays();
 
   // Add styles if not already added
   if (!document.getElementById("soloLevelingStatusBarStyles")) {
@@ -1507,10 +1470,8 @@ window.updateQuestUI = function updateQuestUI(quest, questId, type) {
              ${isCompletedToday ? "disabled" : ""}>
       /${quest.targetCount} ${quest.metric}
     </div>
+    <div class="window-item-description">${quest.description}</div>
     <div class="window-item-description">
-      <strong>Description:</strong><br>
-      ${quest.description}
-    </div>    <div class="window-item-description">
       ${type === "daily" ? (isCompletedToday ? "Completed Today" : `Time remaining: ${formatTimeRemaining(timeRemaining)}`) : ""}
     </div>
     <div class="window-item-progress">
@@ -1781,12 +1742,11 @@ async function logExpNeededToFirestore(level, expNeeded) {
     printToTerminal("Error logging XP requirement: " + error.message, "error");
   }
 }
-// Modify checkLevelUp to show the level-up animation
+
 async function checkLevelUp(playerRef, currentExp) {
   let remainingExp = currentExp;
   let levelsGained = 0;
   let currentLevel = playerStats.level;
-  const previousLevel = currentLevel; // Store initial level for animation
 
   // Keep leveling up while we have enough XP
   while (remainingExp >= (playerStats.expNeeded || getExpNeededForLevel(currentLevel))) {
@@ -1817,10 +1777,6 @@ async function checkLevelUp(playerRef, currentExp) {
     // Print level-up message to terminal
     printToTerminal(`LEVEL UP! You are now level ${playerStats.level}!`, "success");
     showNotification(`Leveled up to level ${playerStats.level}!`);
-    
-    // Show level-up animation
-    showLevelUpAnimation(previousLevel, playerStats.level);
-    
     await updateStatusBar();
     // Check for rank up
     await checkAndUpdateRank(playerRef, playerStats);
@@ -2222,7 +2178,7 @@ window.sellShard = async function sellShard(shardId, quantity) {
       return;
     }
 
-    let totalQuantity = Math.min(quantity, shards.length);
+    const totalQuantity = Math.min(quantity, shards.length);
     const goldReward = shards[0].goldValue * totalQuantity;
 
     // Remove the specified quantity of shards from the inventory
@@ -2647,124 +2603,35 @@ function getRandomItem(array) {
 }
 
 
-// Update setPlayerName function to check for name change token
 window.setPlayerName = async function setPlayerName(args) {
-  if (!currentUser) {
+  if (!isAuthenticated) {
     printToTerminal("You must !reawaken first.", "error");
     return;
   }
 
-  // Check if user is trying to change existing name
-  const currentName = playerStats.profile?.name;
-  const newName = args[0];
-  
-  if (currentName && currentName !== newName) {
-    // User is changing name, check for name change token
-    const playerRef = db.collection("players").doc(currentUser.uid);
-    const playerDoc = await playerRef.get();
-    
-    if (!playerDoc.exists) {
-      printToTerminal("Player data not found.", "error");
-      return;
-    }
-    
-    const player = playerDoc.data();
-    const inventory = player.inventory || [];
-    
-    // Check if player has a name change token
-    const nameChangeToken = inventory.find(item => 
-      item.id === "name_change_token" && (item.quantity || 1) > 0
-    );
-    
-    if (!nameChangeToken) {
-      printToTerminal("You need a Name Change Token to change your name.", "error");
-      printToTerminal("You can purchase one from the shop.", "info");
-      return;
-    }
-    
-    // Use up one token
-    try {
-      await db.runTransaction(async (transaction) => {
-        const playerSnapshot = await transaction.get(playerRef);
-        const playerData = playerSnapshot.data();
-        const inventory = playerData.inventory || [];
-        
-        // Update token quantity
-        const updatedInventory = inventory.map(item => {
-          if (item.id === "name_change_token") {
-            return { 
-              ...item, 
-              quantity: (item.quantity || 1) - 1,
-              lastUsed: firebase.firestore.FieldValue.serverTimestamp()
-            };
-          }
-          return item;
-        }).filter(item => 
-          // Remove items with 0 quantity
-          item.id !== "name_change_token" || (item.quantity || 1) > 0
-        );
-        
-        // Update player profile with new name
-        if (!playerData.profile) {
-          playerData.profile = { name: newName };
-          transaction.update(playerRef, { 
-            profile: { name: newName },
-            inventory: updatedInventory
-          });
-        } else {
-          transaction.update(playerRef, { 
-            'profile.name': newName,
-            inventory: updatedInventory
-          });
-        }
-      });
-      
-      // Update local playerStats
-      if (!playerStats.profile) {
-        playerStats.profile = { name: newName };
-      } else {
-        playerStats.profile.name = newName;
-      }
-      
-      printToTerminal(`Name changed to "${newName}". You used 1 Name Change Token.`, "success");
-      showNotification(`Name changed to "${newName}"`);
-      
-      // Update UI
-      updateStatusBar();
-      updateTerminalPrompt();
-      windowSystem.updateProfileWindow();
-      windowSystem.updateInventoryWindow();
-      
-    } catch (error) {
-      console.error("Error changing name:", error);
-      printToTerminal("Error changing name: " + error.message, "error");
-    }
-  } else {
-    // First time setting name, no token needed
-    try {
-      const playerRef = db.collection("players").doc(currentUser.uid);
-      
-      if (!playerStats.profile) {
-        await playerRef.update({ profile: { name: newName } });
-        playerStats.profile = { name: newName };
-      } else {
-        await playerRef.update({ 'profile.name': newName });
-        playerStats.profile.name = newName;
-      }
-      
-      printToTerminal(`Name set to "${newName}".`, "success");
-      
-      // Update UI
-      updateStatusBar();
-      updateTerminalPrompt();
-      windowSystem.updateProfileWindow();
-      
-    } catch (error) {
-      console.error("Error setting name:", error);
-      printToTerminal("Error setting name: " + error.message, "error");
-    }
+  if (args.length === 0) {
+    printToTerminal("Please provide a name.", "error");
+    return;
   }
-};
+
+  const name = args[0];
+  const playerRef = db.collection("players").doc(currentUser.uid);
+
+  try {
+    await playerRef.update({
+      "profile.name": name,
+    });
+    playerStats.profile.name = name;
+    printToTerminal(`Name set to: ${name}`, "success");
+    updateTerminalPrompt();
+    if (windowSystem) {
+      windowSystem.updateWindowContent("profileWindow");
+    }
+  } catch (error) {
+    printToTerminal("Error setting name: " + error.message, "error");
+  }
+}
+
 window.setPlayerTitle = async function setPlayerTitle(args) {
   if (!isAuthenticated) {
     printToTerminal("You must !reawaken first.", "error");
@@ -2892,67 +2759,7 @@ window.setPlayerClass = async function setPlayerClass(args) {
     printToTerminal("Error updating class: " + error.message, "error");
   }
 }
-// Add this function to handle setting a title directly from inventory
-window.setProfileTitle = async function setProfileTitle(title) {
-  if (!currentUser) {
-    showNotification("You must be logged in to change your title", "error");
-    return;
-  }
-  
-  try {
-    const playerRef = db.collection("players").doc(currentUser.uid);
-    const playerDoc = await playerRef.get();
-    
-    if (!playerDoc.exists) {
-      showNotification("Player data not found", "error");
-      return;
-    }
-    
-    const player = playerDoc.data();
-    
-    // Verify player has this title unlocked
-    if (!player.unlockedTitles || !player.unlockedTitles.includes(title)) {
-      showNotification("You don't own this title", "error");
-      return;
-    }
-    
-    // Update title in database
-    await playerRef.update({
-      'profile.title': title
-    });
-    
-    // Update title color if applicable
-    if (player.unlockedTitleColors) {
-      const titleData = player.unlockedTitleColors.find(t => t.title === title);
-      if (titleData && titleData.color) {
-        await playerRef.update({
-          'profile.titleColor': titleData.color
-        });
-        if (playerStats.profile) playerStats.profile.titleColor = titleData.color;
-      } else {
-        // Reset to default white if no color for this title
-        await playerRef.update({
-          'profile.titleColor': null
-        });
-        if (playerStats.profile) playerStats.profile.titleColor = null;
-      }
-    }
-    
-    // Update local stats
-    if (!playerStats.profile) playerStats.profile = {};
-    playerStats.profile.title = title;
-    
-    // Update UI
-    showNotification(`Title changed to "${title}"`, "success");
-    updateStatusBar();
-    updateTerminalPrompt();
-    windowSystem.updateProfileWindow();
-    
-  } catch (error) {
-    console.error("Error setting title:", error);
-    showNotification("Error setting title: " + error.message, "error");
-  }
-};
+
 // Window System
 const windowSystem = {
   windows: {
@@ -3238,483 +3045,135 @@ const windowSystem = {
       const player = (await playerRef.get()).data();
       const inventoryList = document.getElementById("inventoryItemsList");
       inventoryList.innerHTML = "";
-  
-      // Add inventory stats header
-      const inventoryHeader = document.createElement("div");
-      inventoryHeader.className = "inventory-header";
-      inventoryHeader.innerHTML = `
-        <div class="inventory-stats">
-          <div class="inventory-stat">
-            <span class="stat-label">Items:</span>
-            <span class="stat-value">${player.inventory?.length || 0}</span>
-          </div>
-          <div class="inventory-stat">
-            <span class="stat-label">Gold:</span>
-            <span class="stat-value">${player.gold || 0}</span>
-          </div>
-        </div>
-        <div class="inventory-tabs">
-          <button class="inventory-tab active" data-tab="all">All</button>
-          <button class="inventory-tab" data-tab="consumable">Consumable</button>
-          <button class="inventory-tab" data-tab="title">Titles</button>
-          <button class="inventory-tab" data-tab="special">Special</button>
-        </div>
-      `;
-      inventoryList.appendChild(inventoryHeader);
-  
+
       if (!player.inventory || player.inventory.length === 0) {
-        const emptyMessage = document.createElement("div");
-        emptyMessage.className = "inventory-empty";
-        emptyMessage.textContent = "Your inventory is empty";
-        inventoryList.appendChild(emptyMessage);
+        inventoryList.innerHTML =
+          '<div class="window-item">Your inventory is empty</div>';
         return;
       }
-  
-      // Create grid container for items
-      const itemsGrid = document.createElement("div");
-      itemsGrid.className = "inventory-grid";
-      inventoryList.appendChild(itemsGrid);
-  
+
       // Group inventory items by ID to handle stackable items
-      const groupedInventory = {};
-      player.inventory.forEach(item => {
-        if (!groupedInventory[item.id]) {
-          groupedInventory[item.id] = { ...item, quantity: item.quantity || 1 };
-        } else if (item.quantity) {
-          groupedInventory[item.id].quantity += item.quantity;
+      const groupedInventory = player.inventory.reduce((acc, item) => {
+        if (!acc[item.id]) {
+          acc[item.id] = { ...item, quantity: 1 };
         } else {
-          groupedInventory[item.id].quantity++;
+          acc[item.id].quantity++;
         }
-      });
-  
-      // Process each inventory item
-      Object.values(groupedInventory).forEach(item => {
-        const itemData = Object.values(ITEMS).find(i => i.id === item.id) || item;
-        
+        return acc;
+      }, {});
+
+      for (const itemId in groupedInventory) {
+        const item = groupedInventory[itemId];
+        const itemData = Object.values(ITEMS).find(
+          (i) => i.id === itemId
+        ) || item; // Handle shards directly if not found in ITEMS
+
         if (itemData) {
           const itemElement = document.createElement("div");
-          itemElement.className = "inventory-item";
-          itemElement.dataset.category = itemData.category || "special";
-          
-          // Check if item has expired
-          const isExpired = item.expiresAt && item.expiresAt <= Date.now();
+          itemElement.className = "window-item";
+
+          const isExpired =
+            item.expiresAt && item.expiresAt <= Date.now();
+          const timeLeft = item.expiresAt
+            ? Math.max(0, item.expiresAt - Date.now())
+            : null;
+
           if (isExpired) {
             itemElement.classList.add("expired-item");
           }
-          
-          // Generate image path and placeholder
-          const imagePath = `./assets/items/${item.id}.png`;
-          const placeholderImage = `https://via.placeholder.com/64?text=${item.id.substring(0, 2)}`;
-          
-          // Determine item actions based on type
-          let actionButtons = '';
-          
-          // Title items
-          if (itemData.effect && itemData.effect.type === "title") {
-            actionButtons = `<button onclick="setProfileTitle('${itemData.effect.value}')" class="inventory-button">Set Title</button>`;
-          }
-          // Name change token
-          else if (itemData.effect && itemData.effect.type === "name_change") {
-            actionButtons = `<button onclick="showSetNamePrompt()" class="inventory-button">Change Name</button>`;
-          }
-          // Consumable items
-          else if (itemData.consumable || itemData.duration) {
-            actionButtons = `<button onclick="useItem('${itemData.id}')" class="inventory-button">Use</button>`;
-          }
-          // Shards
-          else if (itemData.type === "shard") {
-            if (item.quantity > 1) {
-              actionButtons = `
-                <button onclick="useShard('${itemData.id}', ${item.quantity})" class="inventory-button">Use All</button>
-                <button onclick="sellShard('${itemData.id}', ${item.quantity})" class="inventory-button">Sell All</button>
-              `;
-            } else {
-              actionButtons = `
-                <button onclick="useShard('${itemData.id}', 1)" class="inventory-button">Use</button>
-                <button onclick="sellShard('${itemData.id}', 1)" class="inventory-button">Sell</button>
-              `;
-            }
-          }
-          // Other items
-          else {
-            actionButtons = `<button onclick="sellItem('${itemData.id}')" class="inventory-button">Sell</button>`;
-          }
-          
-          // Create item tooltip content
-          let tooltipContent = `
-            <div class="tooltip-title">${itemData.name}</div>
-            <div class="tooltip-description">${itemData.description}</div>
-          `;
-          
-          if (itemData.duration) {
-            tooltipContent += `<div class="tooltip-duration">Duration: ${formatDuration(itemData.duration)}</div>`;
-          }
-          
-          if (itemData.effect) {
-            let effectDescription = "";
-            
-            if (itemData.effect.type === "global_xp") {
-              effectDescription = `${Math.round((itemData.effect.value - 1) * 100)}% XP boost`;
-            } else if (itemData.effect.type === "title") {
-              effectDescription = `Grants title: "${itemData.effect.value}"`;
-              if (itemData.effect.color) {
-                effectDescription += ` (${itemData.effect.color})`;
-              }
-            } else if (itemData.effect.type === "name_change") {
-              effectDescription = "Allows changing your name";
-            }
-            
-            if (effectDescription) {
-              tooltipContent += `<div class="tooltip-effect">Effect: ${effectDescription}</div>`;
-            }
-          }
-          
-          if (itemData.rankRequired) {
-            tooltipContent += `<div class="tooltip-rank">Requires Rank: ${itemData.rankRequired}</div>`;
-          }
-          
+
+          // Check if item is usable or a shard
+          const isUsable =
+            itemData.effect ||
+            itemData.type === "shard"; // Shards are considered usable
+
+          // Calculate total XP and gold for shards
+          let xpReward = 0;
+          let goldReward = 0;
           if (itemData.type === "shard") {
-            tooltipContent += `
-              <div class="tooltip-rewards">
-                XP: ${item.xpValue || 0} × ${item.quantity}
-                Gold: ${item.goldValue || 0} × ${item.quantity}
-              </div>
-            `;
+            const shards = player.inventory.filter(i => i.id === itemId);
+            xpReward = shards.reduce((sum, shard) => sum + shard.xpValue, 0);
+            goldReward = shards.reduce((sum, shard) => sum + shard.goldValue, 0);
           }
-          
-          // Create item HTML
+
           itemElement.innerHTML = `
-            <div class="inventory-item-image" data-tooltip="${encodeURIComponent(tooltipContent)}">
-              <img src="${placeholderImage}" alt="${itemData.name}" data-real-src="${imagePath}">
-              ${item.quantity > 1 ? `<span class="inventory-item-quantity">${item.quantity}</span>` : ''}
-            </div>
-            <div class="inventory-item-name">${itemData.name}</div>
-            <div class="inventory-item-actions">
-              ${actionButtons}
-            </div>
-            ${isExpired ? '<div class="inventory-item-expired">EXPIRED</div>' : ''}
-          `;
-          
-          itemsGrid.appendChild(itemElement);
-        }
-      });
-      
-      // Load images after rendering
-      document.querySelectorAll('.inventory-item-image img').forEach(img => {
-        const realSrc = img.getAttribute('data-real-src');
-        if (realSrc) {
-          const testImage = new Image();
-          testImage.onload = function() {
-            img.src = realSrc;
-          };
-          testImage.src = realSrc;
-        }
-      });
-      
-      // Add tooltip functionality
-      document.querySelectorAll('.inventory-item-image[data-tooltip]').forEach(element => {
-        element.addEventListener('mouseenter', function(e) {
-          const tooltip = document.createElement('div');
-          tooltip.className = 'inventory-tooltip';
-          tooltip.innerHTML = decodeURIComponent(this.getAttribute('data-tooltip'));
-          document.body.appendChild(tooltip);
-          
-          const rect = this.getBoundingClientRect();
-          tooltip.style.left = `${rect.left + window.scrollX}px`;
-          tooltip.style.top = `${rect.bottom + window.scrollY + 5}px`;
-          
-          this.tooltip = tooltip;
-        });
-        
-        element.addEventListener('mouseleave', function() {
-          if (this.tooltip) {
-            this.tooltip.remove();
-            this.tooltip = null;
-          }
-        });
-      });
-      
-      // Add tab functionality
-      document.querySelectorAll('.inventory-tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-          // Remove active class from all tabs
-          document.querySelectorAll('.inventory-tab').forEach(t => t.classList.remove('active'));
-          
-          // Add active class to clicked tab
-          this.classList.add('active');
-          
-          const category = this.getAttribute('data-tab');
-          
-          // Show/hide items based on category
-          document.querySelectorAll('.inventory-item').forEach(item => {
-            if (category === 'all' || item.dataset.category === category) {
-              item.style.display = 'flex';
-            } else {
-              item.style.display = 'none';
+            <div class="window-item-title">${itemData.name} x${item.quantity}</div>
+            <div class="window-item-description">${itemData.description}</div>
+            ${
+              timeLeft !== null
+                ? `<div class="window-item-description ${
+                    isExpired ? "text-error" : ""
+                  }">
+                    ${
+                      isExpired
+                        ? "EXPIRED"
+                        : `Time remaining: ${Math.ceil(timeLeft / 60000)} minutes`
+                    }
+                   </div>`
+                : ""
             }
-          });
-        });
-      });
-  
+            ${
+              itemData.type === "shard"
+                ? `<div class="window-item-description">
+                    Rewards: ${xpReward} XP, ${goldReward} gold (product of ${item.quantity} shards)
+                  </div>`
+                : ""
+            }
+            <div class="window-actions">
+              ${
+                isExpired
+                  ? `<div class="window-item-price">Sell price: ${calculateSellPrice(
+                      itemData
+                    )} gold</div>
+                   <button onclick="sellItem('${
+                     itemData.id
+                   }')" class="window-button">Sell</button>`
+                  : isUsable
+                  ? itemData.type === "shard"
+                    ? item.quantity > 1
+                      ? `
+                        <button onclick="useShard('${itemData.id}', ${item.quantity})" class="window-button">Use All</button>
+                        <button onclick="sellShard('${itemData.id}', ${item.quantity})" class="window-button">Sell All</button>
+                      `
+                      : `
+                        <button onclick="useShard('${itemData.id}', 1)" class="window-button">Use</button>
+                        <button onclick="sellShard('${itemData.id}', 1)" class="window-button">Sell</button>
+                      `
+                    : `<button onclick="useItem('${itemData.id}')" class="window-button">Use</button>`
+                  : `<div class="window-item-price">Sell price: ${calculateSellPrice(
+                      itemData
+                    )} gold</div>
+                     <button onclick="sellItem('${
+                       itemData.id
+                     }')" class="window-button">Sell</button>`
+              }
+            </div>
+          `;
+          inventoryList.appendChild(itemElement);
+        }
+      }
+
       // Add CSS if not already present
       if (!document.getElementById("inventoryStyles")) {
         const styleSheet = document.createElement("style");
         styleSheet.id = "inventoryStyles";
         styleSheet.textContent = `
-          #inventoryItemsList {
+          .window-actions {
             display: flex;
-            flex-direction: column;
-            height: 100%;
-            padding: 0;
-            overflow: hidden;
-          }
-          
-          .inventory-header {
-            display: flex;
-            flex-direction: column;
-            padding: 10px;
-            border-bottom: 1px solid rgba(0, 136, 255, 0.3);
-            background: rgba(0, 16, 32, 0.8);
-          }
-        
-          
-          .inventory-stat {
-            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
             align-items: center;
-            gap: 5px;
+            margin-top: 10px;
           }
-          
-          .stat-label {
-            color: #88ccff;
+          .window-item-price {
+            color: #00ffff;
             font-size: 0.9em;
           }
-          
-          .stat-value {
-            color: #00ffff;
-            font-weight: bold;
-            font-size: 1em;
-          }
-          
-          .inventory-tabs {
-            display: flex;
-            gap: 5px;
-            border-bottom: 1px solid rgba(0, 136, 255, 0.2);
-            padding-bottom: 5px;
-          }
-          
-          .inventory-tab {
-            background: rgba(0, 32, 64, 0.5);
-            border: 1px solid rgba(0, 136, 255, 0.3);
-            color: #88ccff;
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.8em;
-            text-transform: uppercase;
-            transition: all 0.2s ease;
-          }
-          
-          .inventory-tab:hover {
-            background: rgba(0, 64, 128, 0.3);
-            border-color: #00ffff;
-          }
-          
-          .inventory-tab.active {
-            background: rgba(0, 136, 255, 0.2);
-            color: #00ffff;
-            border-color: #00ffff;
-          }
-          
-          .inventory-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-            gap: 10px;
-            padding: 10px;
-            overflow-y: auto;
-            flex-grow: 1;
-          }
-          
-          .inventory-empty {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100px;
-            color: #88ccff;
-            font-style: italic;
-          }
-          
-          .inventory-item {
-            display: flex;
-            flex-direction: column;
-            background: rgba(0, 16, 32, 0.7);
-            border: 1px solid rgba(0, 136, 255, 0.3);
-            border-radius: 4px;
-            padding: 8px;
-            transition: all 0.2s ease;
-            position: relative;
-            overflow: hidden;
-          }
-          
-          .inventory-item:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 0 10px rgba(0, 136, 255, 0.2);
-            border-color: #00ffff;
-          }
-          
-          .inventory-item::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, #00ffff, transparent);
-          }
-          
-          .inventory-item-image {
-            position: relative;
-            height: 64px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 5px;
-            cursor: pointer;
-            display: none;
-          }
-          
-          .inventory-item-image img {
-            max-width: 64px;
-            max-height: 64px;
-            object-fit: contain;
-            transition: transform 0.2s ease;
-          }
-          
-          .inventory-item:hover .inventory-item-image img {
-            transform: scale(1.05);
-          }
-          
-          .inventory-item-quantity {
-            position: absolute;
-            bottom: 0;
-            right: 0;
-            background: rgba(0, 0, 0, 0.7);
-            color: #00ffff;
-            font-size: 0.8em;
-            font-weight: bold;
-            padding: 2px 5px;
-            border-radius: 3px;
-            border: 1px solid rgba(0, 136, 255, 0.5);
-          }
-          
-          .inventory-item-name {
-            font-size: 0.85em;
-            color: #ffffff;
-            text-align: center;
-            margin-bottom: 5px;
-            height: 2.5em;
-            overflow: hidden;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-          }
-          
-          .inventory-item-actions {
-            display: flex;
-            gap: 5px;
-            justify-content: center;
-          }
-          
-          .inventory-button {
-            background: linear-gradient(180deg, #0088ff, #0066cc);
-            color: white;
-            border: none;
-            padding: 3px 6px;
-            border-radius: 3px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-size: 0.75em;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border: 1px solid #00aaff;
-            white-space: nowrap;
-          }
-          
-          .inventory-button:hover {
-            background: linear-gradient(180deg, #00aaff, #0088ff);
-            box-shadow: 0 0 5px rgba(0, 136, 255, 0.3);
-          }
-          
-          .inventory-item-expired {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: rgba(255, 0, 0, 0.7);
-            color: white;
-            text-align: center;
-            font-size: 0.75em;
-            padding: 2px 0;
-            transform: rotate(-45deg) translate(-25%, -50%);
-            transform-origin: 0 0;
-          }
-          
           .expired-item {
             opacity: 0.7;
           }
-          
-          .inventory-tooltip {
-            position: absolute;
-            z-index: 2000;
-            background: rgba(0, 16, 32, 0.95);
-            border: 1px solid #0088ff;
-            border-radius: 4px;
-            padding: 10px;
-            width: 250px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-            pointer-events: none;
-          }
-          
-          .tooltip-title {
-            color: #00ffff;
-            font-weight: bold;
-            font-size: 1em;
-            margin-bottom: 5px;
-            border-bottom: 1px solid rgba(0, 136, 255, 0.3);
-            padding-bottom: 3px;
-          }
-          
-          .tooltip-description {
-            color: #88ccff;
-            font-size: 0.85em;
-            margin-bottom: 8px;
-          }
-          
-          .tooltip-duration,
-          .tooltip-effect,
-          .tooltip-rank,
-          .tooltip-rewards {
-            color: #ffffff;
-            font-size: 0.8em;
-            margin-top: 5px;
-          }
-          
-          /* Scrollbar styling */
-          .inventory-grid::-webkit-scrollbar {
-            width: 8px;
-          }
-          
-          .inventory-grid::-webkit-scrollbar-track {
-            background: rgba(0, 16, 32, 0.5);
-            border-radius: 4px;
-          }
-          
-          .inventory-grid::-webkit-scrollbar-thumb {
-            background: #0088ff;
-            border-radius: 4px;
-          }
-          
-          .inventory-grid::-webkit-scrollbar-thumb:hover {
-            background: #00aaff;
+          .text-error {
+            color: #ff4444;
           }
         `;
         document.head.appendChild(styleSheet);
@@ -3723,8 +3182,6 @@ const windowSystem = {
       console.error("Error updating inventory window:", error);
     }
   },
-
-  
 
   // Add updateWindowContent method
   async updateWindowContent(windowId) {
@@ -3765,116 +3222,83 @@ const windowSystem = {
     }
   },
 
-// Update the profile window function to add title selection UI
-async updateProfileWindow() {
-  try {
-    if (!currentUser) return;
-    
-    const playerRef = db.collection("players").doc(currentUser.uid);
-    const playerDoc = await playerRef.get();
-    if (!playerDoc.exists) return;
-    
-    const player = playerDoc.data();
-    
-    // Helper function to safely update element text
-    const safeUpdateElement = (id, value, defaultValue = "Not set") => {
-      const element = document.getElementById(id);
-      if (element) {
-        element.textContent = value || defaultValue;
+  async updateProfileWindow() {
+    try {
+      if (!currentUser) return;
+      
+      const playerRef = db.collection("players").doc(currentUser.uid);
+      const playerDoc = await playerRef.get();
+      if (!playerDoc.exists) return;
+
+      const player = playerDoc.data();
+
+      // Helper function to safely update element content
+      const safeUpdateElement = (id, value, defaultValue = "Not set") => {
+        const element = document.getElementById(id);
+        if (element) {
+          if (id === "profileTitle" && player.profile.titleColor) {
+            element.style.color = player.profile.titleColor;
+            element.textContent = value || defaultValue;
+          } else {
+            element.style.color = ""; // Reset color for non-title elements
+          }
+          element.textContent = value || defaultValue;
+        }
+      };
+
+      // Update Character Info section
+      safeUpdateElement("profileName", player?.profile?.name);
+      safeUpdateElement("profileTitle", player?.profile?.title, "Novice");
+      safeUpdateElement("profileClass", player?.profile?.class, "Hunter");
+      safeUpdateElement("profileBio", player?.profile?.bio);
+
+      // Update Stats section
+      safeUpdateElement("profileLevel", player.level, "1");
+      safeUpdateElement("profileRank", player.rank, "E");
+      safeUpdateElement("profileExp", `${player.exp || 0}/${player.expNeeded        || 100}`, "0/100");
+      safeUpdateElement("profileGold", player.gold, "0");
+      safeUpdateElement("profileQuestsCompleted", player.questsCompleted, "0");
+      safeUpdateElement("profileStreak", `${player.streak || 0} days`);
+
+      // Update Water Intake section
+      safeUpdateElement("profileWaterIntake", `${player.waterIntake?.current || 0}/${player.waterIntake?.goal || 8} glasses`);
+      const waterBar = document.getElementById("profileWaterBar");
+      if (waterBar) {
+        const waterProgress = ((player.waterIntake?.current || 0) / (player.waterIntake?.goal || 8)) * 100;
+        waterBar.style.width = `${Math.min(100, waterProgress)}%`;
       }
-    };
-    
-    // Update basic profile info
-    safeUpdateElement("profileName", player.profile?.name || "Anonymous");
-    safeUpdateElement("profileTitle", player.profile?.title || "Novice");
-    safeUpdateElement("profileRank", player.rank || "E");
-    safeUpdateElement("profileLevel", `${player.level || 1}`);
-    
-    // Update stats
-    safeUpdateElement("profileExp", `${player.exp || 0}/${player.expNeeded || 100}`);
-    safeUpdateElement("profileGold", player.gold || 0);
-    safeUpdateElement("profileQuests", player.questsCompleted || 0);
-    safeUpdateElement("profileDungeons", player.dungeonsCompleted || 0);
-    safeUpdateElement("profileStreak", `${player.streak || 0} days`);
-    safeUpdateElement("profileAchievements", player.achievementsUnlocked?.length || 0);
-    
-    // Update biography
-    safeUpdateElement("profileBio", player.profile?.bio || "No biography set.");
-    
-    // Update physical attributes
-    safeUpdateElement("profileClass", player.profile?.class || "Not chosen");
-    safeUpdateElement("profileAge", player.profile?.age || "Not set");
-    safeUpdateElement("profileHeight", player.profile?.height || "Not set");
-    safeUpdateElement("profileWeight", player.profile?.weight || "Not set");
-    safeUpdateElement("profileGender", player.profile?.gender || "Not set");
-    
-    // Update title selection area - new code
-    const titleSelectBox = document.getElementById("profileTitleSelect");
-    if (titleSelectBox) {
-      titleSelectBox.innerHTML = "";
+      safeUpdateElement("profileWaterStreak", `Streak: ${player.waterIntake?.streakDays || 0} days`);
+
+      // Update Join Date
+      const joinDate = player.profile?.joinDate?.toDate() || new Date();
+      safeUpdateElement("profileJoinDate", joinDate.toLocaleDateString());
       
-      // Add the default "Novice" title
-      const defaultOption = document.createElement("option");
-      defaultOption.value = "Novice";
-      defaultOption.textContent = "Novice";
-      defaultOption.selected = player.profile?.title === "Novice" || !player.profile?.title;
-      titleSelectBox.appendChild(defaultOption);
+      // Update Physical Stats section
+      const heightValue = player.profile?.height ? `${player.profile.height} cm` : "Not set";
+      const weightValue = player.profile?.weight ? `${player.profile.weight} kg` : "Not set";
+      const ageValue = player.profile?.age ? `${player.profile.age} years` : "Not set";
+      safeUpdateElement("profileAge", ageValue);
+      safeUpdateElement("profileHeight", heightValue);
+      safeUpdateElement("profileWeight", weightValue);
+      safeUpdateElement("profileGender", player.profile?.gender);
       
-      // Add all unlocked titles
-      if (player.unlockedTitles && player.unlockedTitles.length > 0) {
-        player.unlockedTitles.forEach(title => {
+
+      // Update unlocked titles dropdown
+      const titleDropdown = document.getElementById("profileTitleDropdown");
+      if (titleDropdown) {
+        titleDropdown.innerHTML = "";
+        player.profile.unlockedTitles.forEach((title) => {
           const option = document.createElement("option");
           option.value = title;
           option.textContent = title;
-          option.selected = player.profile?.title === title;
-          titleSelectBox.appendChild(option);
+          titleDropdown.appendChild(option);
         });
       }
-      
-      // Add event listener for title change
-      titleSelectBox.addEventListener("change", async function() {
-        const newTitle = this.value;
-        try {
-          // Update title in Firestore
-          await playerRef.update({
-            'profile.title': newTitle
-          });
-          
-          // Update title color if applicable
-          if (player.unlockedTitleColors) {
-            const titleData = player.unlockedTitleColors.find(t => t.title === newTitle);
-            if (titleData && titleData.color) {
-              await playerRef.update({
-                'profile.titleColor': titleData.color
-              });
-              playerStats.profile.titleColor = titleData.color;
-            } else {
-              // Reset to default white if no color for this title
-              await playerRef.update({
-                'profile.titleColor': null
-              });
-              if (playerStats.profile) playerStats.profile.titleColor = null;
-            }
-          }
-          
-          // Update local stats
-          if (!playerStats.profile) playerStats.profile = {};
-          playerStats.profile.title = newTitle;
-          
-          // Update UI
-          updateTerminalPrompt();
-          safeUpdateElement("profileTitle", newTitle);
-          showNotification(`Title changed to "${newTitle}"`);
-        } catch (error) {
-          console.error("Error changing title:", error);
-          showNotification("Error changing title", "error");
-        }
-      });
+
+    } catch (error) {
+      console.error("Error updating profile window:", error);
     }
-  } catch (error) {
-    console.error("Error updating profile window:", error);
-  }
-},
+  },
 
   async updateQuestsWindow(type = "normal") {
     if (!currentUser) return;
@@ -3918,10 +3342,8 @@ async updateProfileWindow() {
                    style="width: 60px; background: transparent; color: var(--text-color); border: 1px solid var(--system-blue);">
             /${quest.targetCount} ${quest.metric}
           </div>
-    <div class="window-item-description">
-      <strong>Description:</strong><br>
-      ${quest.description}
-    </div>          <div class="window-item-progress">
+          <div class="window-item-description">${quest.description}</div>
+          <div class="window-item-progress">
             <div class="window-item-progress-bar" style="width: ${(quest.currentCount / quest.targetCount) * 100}%"></div>
           </div>
           <div class="window-actions" style="margin-top: 10px;">
@@ -4594,307 +4016,278 @@ async updateProfileWindow() {
     }
   },
 
-  
-async updateShopWindow() {
-  if (!currentUser) return;
-  try {
-    const playerRef = db.collection("players").doc(currentUser.uid);
-    const player = (await playerRef.get()).data();
-    const shopItemsList = document.getElementById("shopItemsList");
-    shopItemsList.innerHTML = "";
+  async updateShopWindow() {
+    if (!currentUser) return;
+    try {
+      const playerRef = db.collection("players").doc(currentUser.uid);
+      const player = (await playerRef.get()).data();
+      const shopItemsList = document.getElementById("shopItemsList");
+      shopItemsList.innerHTML = "";
 
-    // Group items by category
-    const categories = {
-      booster: { name: "🎓 XP & Level Boosters", items: [] },
-      enhancer: { name: "🎯 Quest Enhancers", items: [] },
-      training: { name: "💪 Training Boosters", items: [] },
-      upgrade: { name: "🏆 Permanent Upgrades", items: [] },
-      economy: { name: "💰 Gold & Economy", items: [] },
-      title: { name: "🏅 Special Titles & Cosmetics", items: [] },
-      utility: { name: "🛠️ Utility Items", items: [] },
-      special: { name: "🌟 Special Items", items: [] },
-      cosmetic: { name: "✨ Cosmetic Items", items: [] },
-    };
+      // Group items by category
+      const categories = {
+        booster: { name: "🎓 XP & Level Boosters", items: [] },
+        enhancer: { name: "🎯 Quest Enhancers", items: [] },
+        training: { name: "💪 Training Boosters", items: [] },
+        upgrade: { name: "🏆 Permanent Upgrades", items: [] },
+        economy: { name: "💰 Gold & Economy", items: [] },
+        title: { name: "🏅 Special Titles & Cosmetics", items: [] },
+        special: { name: "🌟 Special Items", items: [] },
+      };
 
-    // Sort items into categories
-    Object.entries(ITEMS).forEach(([itemId, item]) => {
-      if (categories[item.category]) {
-        categories[item.category].items.push({ id: itemId, ...item });
-      } else {
-        // If category doesn't exist, add to special
-        categories.special.items.push({ id: itemId, ...item });
-      }
-    });
+      // Sort items into categories
+      Object.entries(ITEMS).forEach(([itemId, item]) => {
+        if (categories[item.category]) {
+          categories[item.category].items.push({ id: itemId, ...item });
+        }
+      });
 
-    // Create sections for each category
-    Object.values(categories).forEach((category) => {
-      if (category.items.length > 0) {
-        // Add category header
-        const categorySection = document.createElement("div");
-        categorySection.className = "shop-category-section";
+      // Create sections for each category
+      Object.values(categories).forEach((category) => {
+        if (category.items.length > 0) {
+          // Add category header
+          const categorySection = document.createElement("div");
+          categorySection.className = "shop-category-section";
 
-        const categoryHeader = document.createElement("div");
-        categoryHeader.className = "shop-category-header";
-        categoryHeader.textContent = category.name;
-        categorySection.appendChild(categoryHeader);
+          const categoryHeader = document.createElement("div");
+          categoryHeader.className = "shop-category-header";
+          categoryHeader.textContent = category.name;
+          categorySection.appendChild(categoryHeader);
 
-        // Add items container
-        const itemsContainer = document.createElement("div");
-        itemsContainer.className = "shop-items-container";
+          // Add items container
+          const itemsContainer = document.createElement("div");
+          itemsContainer.className = "shop-items-container";
 
-        // Add items in category
-        category.items.forEach((item) => {
-          const itemElement = document.createElement("div");
-          itemElement.className = "shop-item";
+          // Add items in category
+          category.items.forEach((item) => {
+            const itemElement = document.createElement("div");
+            itemElement.className = "shop-item";
 
-          // Check if player meets rank requirement
-          const canPurchase =
-            !item.rankRequired ||
-            isRankSufficient(playerStats.rank, item.rankRequired);
+            // Check if player meets rank requirement
+            const canPurchase =
+              !item.rankRequired ||
+              isRankSufficient(playerStats.rank, item.rankRequired);
 
-          // Check if item is a one-time purchase and already owned
-          const isOneTimePurchase = item.effect && (
-            item.effect.type === "title" ||
-            item.effect.type === "profile_custom" ||
-            item.effect.type === "achievement_tracking" ||
-            item.effect.type === "milestone_custom" ||
-            item.effect.type === "quest_chain"
-          );
+            // Check if item is a one-time purchase and already owned
+            const isOneTimePurchase = item.effect && (
+              item.effect.type === "title" ||
+              item.effect.type === "profile_custom" ||
+              item.effect.type === "achievement_tracking" ||
+              item.effect.type === "milestone_custom" ||
+              item.effect.type === "quest_chain"
+            );
 
-          // Check if user already has this title in unlockedTitles
-          const hasTitleUnlocked = 
-            item.effect?.type === "title" && 
-            player.unlockedTitles && 
-            player.unlockedTitles.includes(item.effect.value);
+            const alreadyOwned = isOneTimePurchase && player.inventory && player.inventory.some(invItem => invItem.id === item.id);
 
-          const alreadyOwned = isOneTimePurchase && 
-            ((player.inventory && player.inventory.some(invItem => invItem.id === item.id)) || hasTitleUnlocked);
+            if (!canPurchase || alreadyOwned) {
+              itemElement.classList.add("shop-item-locked");
+            }
 
-          if (!canPurchase || alreadyOwned) {
-            itemElement.classList.add("shop-item-locked");
-          }
-
-          // Generate placeholder image path based on item ID
-          const imagePath = `./assets/items/${item.id}.png`;
-          const placeholderImage = `https://img.myloview.com/posters/pixel-art-game-item-icon-and-objects-for-the-design-vector-illustration-fantasy-world-old-game-console-700-179505611.jpg`;
-
-          itemElement.innerHTML = `
-            <div class="shop-item-image">
-              <img src="${imagePath}" onerror="this.src='${placeholderImage}'" alt="${item.name}">
-            </div>
-            <div class="shop-item-header">
-              <span class="shop-item-name">${item.name}</span>
+            itemElement.innerHTML = `
+              <div class="shop-item-header">
+                <span class="shop-item-name">${item.name}</span>
+                ${
+                  item.rankRequired
+                    ? `<span class="shop-item-rank">Rank ${item.rankRequired}</span>`
+                    : ""
+                }
+              </div>
+              <div class="shop-item-description">${item.description}</div>
+              <div class="shop-item-footer">
+                <span class="shop-item-price">${item.price} Gold</span>
+                ${
+                  alreadyOwned
+                    ? `<div class="shop-item-requirement">Purchased</div>`
+                    : canPurchase
+                    ? `<button onclick="purchaseItem('${item.id}')" class="shop-button">Purchase</button>`
+                    : `<div class="shop-item-requirement">Requires Rank ${item.rankRequired}</div>`
+                }
+              </div>
               ${
-                item.rankRequired
-                  ? `<span class="shop-item-rank">Rank ${item.rankRequired}</span>`
+                item.duration
+                  ? `<div class="shop-item-duration">Duration: ${formatDuration(
+                      item.duration
+                    )}</div>`
                   : ""
               }
-            </div>
-            <div class="shop-item-description">${item.description}</div>
-            <div class="shop-item-footer">
-              <span class="shop-item-price">${item.price} Gold</span>
-              ${
-                alreadyOwned
-                  ? `<div class="shop-item-owned">Purchased</div>`
-                  : canPurchase
-                  ? `<button onclick="purchaseItem('${item.id}')" class="shop-button">Purchase</button>`
-                  : `<div class="shop-item-requirement">Requires Rank ${item.rankRequired}</div>`
-              }
-            </div>
-            ${
-              item.duration
-                ? `<div class="shop-item-duration">Duration: ${formatDuration(
-                    item.duration
-                  )}</div>`
-                : ""
-            }
-          `;
-          itemsContainer.appendChild(itemElement);
-        });
+            `;
+            itemsContainer.appendChild(itemElement);
+          });
 
-        categorySection.appendChild(itemsContainer);
-        shopItemsList.appendChild(categorySection);
+          categorySection.appendChild(itemsContainer);
+          shopItemsList.appendChild(categorySection);
+        }
+      });
+
+      // Add CSS if not already present
+      if (!document.getElementById("shopStyles")) {
+        const styleSheet = document.createElement("style");
+        styleSheet.id = "shopStyles";
+        styleSheet.textContent = `
+          #shopItemsList {
+            padding: 10px;
+          }
+          .shop-category-section {
+            margin-bottom: 15px;
+          }
+          .shop-category-header {
+            font-size: 1em;
+            font-weight: bold;
+            color: #00ffff;
+            margin: 10px 0 5px 0;
+            padding: 3px 0;
+            border-bottom: 1px solid #0088ff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+          }
+          .shop-items-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 8px;
+            padding: 5px 0;
+          }
+          .shop-item {
+            background: rgba(0, 16, 32, 0.95);
+            border: 1px solid #0088ff;
+            border-radius: 4px;
+            padding: 8px;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+            font-size: 0.9em;
+          }
+          .shop-item::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #00ffff, transparent);
+          }
+          .shop-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 0 10px rgba(0, 136, 255, 0.2);
+            border-color: #00ffff;
+          }
+          .shop-item-locked {
+            opacity: 0.7;
+            border-color: #444;
+          }
+          .shop-item-locked::after {
+            background: linear-gradient(90deg, transparent, #444, transparent);
+          }
+          .shop-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+            border-bottom: 1px solid rgba(0, 136, 255, 0.2);
+            padding-bottom: 4px;
+            gap: 8px;
+          }
+          .shop-item-name {
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 5px rgba(0, 255, 255, 0.3);
+            font-size: 0.9em;
+          }
+          .shop-item-rank {
+            color: #00ffff;
+            font-size: 0.8em;
+            background: rgba(0, 136, 255, 0.1);
+            padding: 1px 6px;
+            border-radius: 3px;
+            border: 1px solid rgba(0, 136, 255, 0.3);
+            white-space: nowrap;
+          }
+          .shop-item-description {
+            color: #88ccff;
+            font-size: 0.85em;
+            margin-bottom: 8px;
+            min-height: 32px;
+            line-height: 1.3;
+          }
+          .shop-item-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 4px;
+            background: rgba(0, 16, 32, 0.3);
+            padding: 4px 6px;
+            border-radius: 3px;
+            gap: 8px;
+          }
+          .shop-item-price {
+            color: #00ffff;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(0, 255, 255, 0.3);
+            font-size: 0.85em;
+            white-space: nowrap;
+          }
+          .shop-button {
+            background: linear-gradient(180deg, #0088ff, #0066cc);
+            color: white;
+            border: none;
+            padding: 3px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            font-size: 0.8em;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            border: 1px solid #00aaff;
+            white-space: nowrap;
+          }
+          .shop-button:hover {
+            background: linear-gradient(180deg, #00aaff, #0088ff);
+            box-shadow: 0 0 5px rgba(0, 136, 255, 0.3);
+          }
+          .shop-item-requirement {
+            color: #ff4444;
+            font-size: 0.8em;
+            background: rgba(255, 68, 68, 0.1);
+            padding: 1px 6px;
+            border-radius: 3px;
+            border: 1px solid rgba(255, 68, 68, 0.3);
+          }
+          .shop-item-requirement:contains("Purchased") {
+            color: #44ff44;
+            background: rgba(68, 255, 68, 0.1);
+            border-color: rgba(68, 255, 68, 0.3);
+          }
+          .shop-item-duration {
+            color: #88ccff;
+            font-size: 0.75em;
+            margin-top: 4px;
+            text-align: right;
+            font-style: italic;
+          }
+
+          /* Scrollbar Styling */
+          #shopItemsList::-webkit-scrollbar {
+            width: 8px;
+          }
+          #shopItemsList::-webkit-scrollbar-track {
+            background: rgba(0, 16, 32, 0.95);
+            border-radius: 4px;
+          }
+          #shopItemsList::-webkit-scrollbar-thumb {
+            background: #0088ff;
+            border-radius: 4px;
+          }
+          #shopItemsList::-webkit-scrollbar-thumb:hover {
+            background: #00aaff;
+          }
+        `;
+        document.head.appendChild(styleSheet);
       }
-    });
-
-    // Add updated CSS 
-    if (!document.getElementById("shopStyles")) {
-      const styleSheet = document.createElement("style");
-      styleSheet.id = "shopStyles";
-      styleSheet.textContent = `
-        #shopItemsList {
-          padding: 10px;
-        }
-        .shop-category-section {
-          margin-bottom: 15px;
-        }
-        .shop-category-header {
-          font-size: 1em;
-          font-weight: bold;
-          color: #00ffff;
-          margin: 10px 0 5px 0;
-          padding: 3px 0;
-          border-bottom: 1px solid #0088ff;
-          text-transform: uppercase;
-          letter-spacing: 1px;
-          text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
-        }
-        .shop-items-container {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-          gap: 10px;
-          padding: 5px 0;
-        }
-        .shop-item {
-          background: rgba(0, 16, 32, 0.95);
-          border: 1px solid #0088ff;
-          border-radius: 4px;
-          padding: 10px;
-          transition: all 0.2s ease;
-          position: relative;
-          overflow: hidden;
-          font-size: 0.9em;
-          display: flex;
-          flex-direction: column;
-        }
-        .shop-item::after {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          height: 1px;
-          background: linear-gradient(90deg, transparent, #00ffff, transparent);
-        }
-        .shop-item:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 0 10px rgba(0, 136, 255, 0.2);
-          border-color: #00ffff;
-        }
-        .shop-item-locked {
-          opacity: 0.7;
-          border-color: #444;
-        }
-        .shop-item-locked::after {
-          background: linear-gradient(90deg, transparent, #444, transparent);
-        }
-.shop-item-image {
-  text-align: center;
-  margin-bottom: 8px;
-  height: 64px;
-  width: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto;
-  overflow: hidden;
-  display: none;
-}
-
-.shop-item-image img {
-  width: 64px;
-  height: 64px;
-  object-fit: contain;
-  transition: opacity 0.2s ease;
-}
-        .shop-item-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 4px;
-          border-bottom: 1px solid rgba(0, 136, 255, 0.2);
-          padding-bottom: 4px;
-          gap: 8px;
-        }
-        .shop-item-name {
-          font-weight: bold;
-          color: #fff;
-          text-shadow: 0 0 5px rgba(0, 255, 255, 0.3);
-          font-size: 0.9em;
-        }
-        .shop-item-rank {
-          color: #00ffff;
-          font-size: 0.8em;
-          background: rgba(0, 136, 255, 0.1);
-          padding: 1px 6px;
-          border-radius: 3px;
-          border: 1px solid rgba(0, 136, 255, 0.3);
-          white-space: nowrap;
-        }
-        .shop-item-description {
-          color: #88ccff;
-          font-size: 0.85em;
-          margin-bottom: 8px;
-          min-height: 32px;
-          line-height: 1.3;
-          flex-grow: 1;
-        }
-        .shop-item-footer {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-top: 4px;
-          background: rgba(0, 16, 32, 0.3);
-          padding: 4px 6px;
-          border-radius: 3px;
-          gap: 8px;
-        }
-        .shop-item-price {
-          color: #00ffff;
-          font-weight: bold;
-          text-shadow: 0 0 5px rgba(0, 255, 255, 0.3);
-          font-size: 0.85em;
-          white-space: nowrap;
-        }
-        .shop-button {
-          background: linear-gradient(180deg, #0088ff, #0066cc);
-          color: white;
-          border: none;
-          padding: 3px 8px;
-          border-radius: 3px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          text-transform: uppercase;
-          font-size: 0.8em;
-          font-weight: bold;
-          letter-spacing: 0.5px;
-          border: 1px solid #00aaff;
-          white-space: nowrap;
-        }
-        .shop-button:hover {
-          background: linear-gradient(180deg, #00aaff, #0088ff);
-          box-shadow: 0 0 5px rgba(0, 136, 255, 0.3);
-        }
-        .shop-item-requirement {
-          color: #ff4444;
-          font-size: 0.8em;
-          background: rgba(255, 68, 68, 0.1);
-          padding: 1px 6px;
-          border-radius: 3px;
-          border: 1px solid rgba(255, 68, 68, 0.3);
-        }
-        .shop-item-owned {
-          color: #44ff44;
-          font-size: 0.8em;
-          background: rgba(68, 255, 68, 0.1);
-          padding: 1px 6px;
-          border-radius: 3px;
-          border: 1px solid rgba(68, 255, 68, 0.3);
-        }
-        .shop-item-duration {
-          color: #88ccff;
-          font-size: 0.75em;
-          margin-top: 4px;
-          text-align: right;
-          font-style: italic;
-        }
-      `;
-      document.head.appendChild(styleSheet);
+    } catch (error) {
+      console.error("Error updating shop window:", error);
     }
-  } catch (error) {
-    console.error("Error updating shop window:", error);
-  }
-},
+  },
 
   async updateBattleWindow() {
     try {
@@ -6004,130 +5397,56 @@ function showSetClassPrompt() {
   }
 }
 
+// Add purchase function for shop
 window.purchaseItem = async function purchaseItem(itemId) {
-  if (!currentUser) {
-    showNotification("You must log in to make purchases", "error");
+  if (!isAuthenticated) {
+    printToTerminal("You must !reawaken first.", "error");
     return;
   }
 
-  try {
-    console.log("Available items:", window.ITEMS);
-    console.log("Trying to purchase item:", itemId);
-
-    const playerRef = db.collection("players").doc(currentUser.uid);
-    
-    // Make sure ITEMS is defined
-    if (!window.ITEMS) {
-      throw new Error("Items database not loaded! Please refresh the page.");
-    }
-    
-    // Find the item by its id property instead of using direct key access
-    const item = Object.values(window.ITEMS).find(item => item.id === itemId);
-    
-    if (!item) {
-      console.error(`Item with id ${itemId} not found in:`, window.ITEMS);
-      throw new Error(`Item "${itemId}" not found in database. Please refresh the page.`);
-    }
-    
-    await db.runTransaction(async (transaction) => {
-      const playerDoc = await transaction.get(playerRef);
-      
-      if (!playerDoc.exists) {
-        throw new Error("Player not found");
-      }
-      
-      const player = playerDoc.data();
-      
-      // Rest of your function using 'item' directly
-      
-      // Check if player meets rank requirement
-      if (item.rankRequired && !isRankSufficient(player.rank, item.rankRequired)) {
-        throw new Error(`You need to be Rank ${item.rankRequired} to purchase this item`);
-      }
-      
-      // Check if player has enough gold
-      if (player.gold < item.price) {
-        throw new Error(`Not enough gold. You need ${item.price - player.gold} more gold.`);
-      }
-      
-      // Handle title items
-      if (item.effect && item.effect.type === "title") {
-        // Add title to unlockedTitles array if not already there
-        const unlockedTitles = player.unlockedTitles || [];
-        if (!unlockedTitles.includes(item.effect.value)) {
-          transaction.update(playerRef, {
-            gold: player.gold - item.price,
-            unlockedTitles: firebase.firestore.FieldValue.arrayUnion(item.effect.value),
-            unlockedTitleColors: firebase.firestore.FieldValue.arrayUnion({
-              title: item.effect.value,
-              color: item.effect.color || "#ffffff"
-            })
-          });
-        } else {
-          throw new Error("You already own this title");
-        }
-      } 
-      else if (item.consumable) {
-        // Add to inventory with quantity
-        const inventory = player.inventory || [];
-        const existingItem = inventory.find(i => i.id === itemId);
-        
-        if (existingItem) {
-          // Update quantity of existing item
-          const updatedInventory = inventory.map(i => {
-            if (i.id === itemId) {
-              return { ...i, quantity: (i.quantity || 1) + 1 };
-            }
-            return i;
-          });
-          
-          transaction.update(playerRef, {
-            gold: player.gold - item.price,
-            inventory: updatedInventory
-          });
-        } else {
-          // Add new item with quantity 1 - Use a regular Date instead of serverTimestamp
-          transaction.update(playerRef, {
-            gold: player.gold - item.price,
-            inventory: firebase.firestore.FieldValue.arrayUnion({
-              id: itemId,
-              quantity: 1,
-              purchasedAt: new Date().getTime() // Use regular JavaScript timestamp
-            })
-          });
-        }
-      } 
-      // Handle other items
-      else {
-        // Add regular item to inventory - Fixed the same way
-        transaction.update(playerRef, {
-          gold: player.gold - item.price,
-          inventory: firebase.firestore.FieldValue.arrayUnion({
-            id: itemId,
-            purchasedAt: new Date().getTime() // Use regular JavaScript timestamp
-          })
-        });
-      }
-      // Update local player stats
-      playerStats.gold -= item.price;
-    });
-    
-    // Show success notification and play sound
-    showNotification(`Successfully purchased ${ITEMS[itemId].name}!`);
-    notificationSystem.playSound("purchase");
-    printToTerminal(`You purchased ${ITEMS[itemId].name} for ${ITEMS[itemId].price} gold.`, "success");
-    
-    // Update UI
-    updateStatusBar();
-    await windowSystem.updateShopWindow();
-    await windowSystem.updateInventoryWindow();
-    
-  } catch (error) {
-    console.error("Error purchasing item:", error);
-    showNotification(error.message, "error");
-    printToTerminal(error.message, "error");
+  // Find item by matching the id property
+  const item = Object.values(ITEMS).find((item) => item.id === itemId);
+  if (!item) {
+    printToTerminal("Item not found.", "error");
+    return;
   }
-};
+
+  if (playerStats.gold < item.price) {
+    printToTerminal("Not enough gold!", "error");
+    return;
+  }
+
+  // Play purchase sound immediately
+  notificationSystem.playSound("buy");
+
+  try {
+    const playerRef = db.collection("players").doc(currentUser.uid);
+
+    await playerRef.update({
+      gold: firebase.firestore.FieldValue.increment(-item.price),
+      inventory: firebase.firestore.FieldValue.arrayUnion({
+        id: itemId,
+        expiresAt: item.duration ? Date.now() + item.duration : null,
+      }),
+    });
+
+    // Update local stats
+    playerStats.gold -= item.price;
+    if (!playerStats.inventory) playerStats.inventory = [];
+    playerStats.inventory.push({
+      id: itemId,
+      expiresAt: item.duration ? Date.now() + item.duration : null,
+    });
+
+    showNotification(`Purchased ${item.name}!`);
+    updateStatusBar();
+    windowSystem.updateWindowContent("shopWindow");
+    windowSystem.updateWindowContent("inventoryWindow");
+  } catch (error) {
+    printToTerminal("Error purchasing item: " + error.message, "error");
+  }
+}
+
 
 // Add bio prompt function
 function showSetBioPrompt() {
@@ -6342,134 +5661,146 @@ async function addExperiencePoints(args) {
   }
 }
 
-window.useItem = async function useItem(itemId) {
-  if (!currentUser) {
-    showNotification("You must be logged in to use items", "error");
+// Add function to use consumable items
+async function useItem(itemId) {
+  if (!isAuthenticated) {
+    printToTerminal("You must !reawaken first.", "error");
+    return;
+  }
+
+  const playerRef = db.collection("players").doc(currentUser.uid);
+  const player = (await playerRef.get()).data();
+
+  // Find the item in the player's inventory
+  const inventoryItem = player.inventory.find((item) => item.id === itemId);
+  if (!inventoryItem) {
+    printToTerminal("Item not found in your inventory.", "error");
+    return;
+  }
+
+  const item = Object.values(ITEMS).find((item) => item.id === itemId);
+  if (!item) {
+    printToTerminal("Invalid item.", "error");
     return;
   }
 
   try {
-    const playerRef = db.collection("players").doc(currentUser.uid);
-    const itemData = ITEMS[itemId];
-    
-    if (!itemData) {
-      showNotification("Item not found", "error");
-      return;
+    switch (item.effect.type) {
+
+      case "name_color":
+        const selectedColor = await showColorPickerDialog();
+        if (selectedColor) {
+          await playerRef.update({
+            "profile.nameColor": selectedColor,
+            inventory: firebase.firestore.FieldValue.arrayRemove(inventoryItem),
+          });
+          printToTerminal(
+            `Used ${item.name} and changed your name color to ${selectedColor}!`,
+            "success"
+          );
+          // Update local playerStats
+          if (!playerStats.profile) playerStats = {};
+          playerStats.profile = playerStats.profile || {};
+          playerStats.profile.nameColor = selectedColor;
+          // Update all windows that show the player's name
+          windowSystem.updateWindowContent("profileWindow");
+          windowSystem.updateWindowContent("leaderboardWindow");
+        }
+        break;
+
+      case "gold":
+        await playerRef.update({
+          gold: firebase.firestore.FieldValue.increment(item.effect.value),
+          inventory: firebase.firestore.FieldValue.arrayRemove(inventoryItem),
+        });
+        playerStats.gold += item.effect.value;
+        printToTerminal(
+          `Used ${item.name} and gained ${item.effect.value} gold!`,
+          "success"
+        );
+        break;
+
+      case "complete_quest":
+      case "reset_daily":
+      case "remove_fatigue":
+        // These items are handled by their respective functions
+        // They should be called here when implemented
+        printToTerminal(`Used ${item.name}!`, "success");
+        break;
+
+      case "title":
+        await playerRef.update({
+          "profile.title": item.effect.value,
+          "profile.titleColor": item.effect.color || null,
+          inventory: firebase.firestore.FieldValue.arrayRemove(inventoryItem),
+        });
+        if (!playerStats.profile) playerStats.profile = {};
+        playerStats.profile.title = item.effect.value;
+        playerStats.profile.titleColor = item.effect.color || null;
+        printToTerminal(`Your title has been set to: ${item.effect.value}!`, "success");
+        showNotification(`Title changed to: ${item.effect.value}`);
+        
+        // Update all windows that might display the title
+        windowSystem.updateWindowContent("profileWindow");
+        windowSystem.updateWindowContent("leaderboardWindow");
+        windowSystem.updateWindowContent("shopWindow");
+        windowSystem.updateWindowContent("inventoryWindow");
+        windowSystem.updateWindowContent("questsWindow");
+        windowSystem.updateWindowContent("dailyQuestsWindow");
+        windowSystem.updateWindowContent("achievementsWindow");
+        windowSystem.updateWindowContent("rankProgressWindow");
+        
+        // Update terminal prompt if it shows the title
+        updateTerminalPrompt();
+        break;
+
+      case "title_color":
+        await playerRef.update({
+          "profile.titleColor": item.effect.value,
+          inventory: firebase.firestore.FieldValue.arrayRemove(inventoryItem),
+        });
+        if (!playerStats.profile) playerStats.profile = {};
+        playerStats.profile.titleColor = item.effect.value;
+        printToTerminal(`Your title color has been set to: ${item.effect.value}!`, "success");
+        showNotification(`Title color changed to: ${item.effect.value}`);
+        
+        // Update all windows that might display the title
+        windowSystem.updateWindowContent("profileWindow");
+        windowSystem.updateWindowContent("leaderboardWindow");
+        windowSystem.updateWindowContent("shopWindow");
+        windowSystem.updateWindowContent("inventoryWindow");
+        windowSystem.updateWindowContent("questsWindow");
+        windowSystem.updateWindowContent("dailyQuestsWindow");
+        windowSystem.updateWindowContent("achievementsWindow");
+        windowSystem.updateWindowContent("rankProgressWindow");
+        rank
+        // Update terminal prompt if it shows the title
+        updateTerminalPrompt();
+        break;
+
+      default:
+        // For items with duration-based effects, they're automatically applied
+        // through the getActiveItemEffects function
+        printToTerminal(`${item.name} is already active!`, "info");
+        return;
     }
 
-    await db.runTransaction(async (transaction) => {
-      const playerDoc = await transaction.get(playerRef);
-      if (!playerDoc.exists) {
-        throw new Error("Player not found");
-      }
-
-      const player = playerDoc.data();
-      const inventory = player.inventory || [];
-      
-      // Find the item in inventory
-      const itemIndex = inventory.findIndex(item => item.id === itemId);
-      if (itemIndex === -1) {
-        throw new Error("Item not found in inventory");
-      }
-      
-      const inventoryItem = inventory[itemIndex];
-      
-      // Handle different item types
-      switch(itemData.effect?.type) {
-        case "title":
-          // For title items, add to unlocked titles and remove from inventory
-          transaction.update(playerRef, {
-            unlockedTitles: firebase.firestore.FieldValue.arrayUnion(itemData.effect.value),
-            inventory: inventory.filter((_, index) => index !== itemIndex)
-          });
-          
-          // If the title has a custom color, add it to unlockedTitleColors
-          if (itemData.effect.color) {
-            transaction.update(playerRef, {
-              unlockedTitleColors: firebase.firestore.FieldValue.arrayUnion({
-                title: itemData.effect.value,
-                color: itemData.effect.color
-              })
-            });
-          }
-          
-          showNotification(`Unlocked title: "${itemData.effect.value}"`);
-          break;
-          
-        case "name_change":
-          // Name change tokens are handled by the setPlayerName function
-          // Just show the name change prompt
-          showSetNamePrompt();
-          break;
-          
-        case "global_xp":
-        case "quest_progress":
-        case "quest_rewards":
-        case "all_stats":
-          // For buff items, apply the effect with duration
-          if (itemData.duration) {
-            // Calculate expiration time
-            const expiresAt = Date.now() + itemData.duration;
-            
-            // Apply the effect to the player
-            const updatedInventory = [...inventory];
-            updatedInventory[itemIndex] = {
-              ...inventoryItem,
-              active: true,
-              expiresAt: expiresAt
-            };
-            
-            transaction.update(playerRef, {
-              inventory: updatedInventory,
-              activeEffects: firebase.firestore.FieldValue.arrayUnion({
-                type: itemData.effect.type,
-                value: itemData.effect.value,
-                expiresAt: expiresAt,
-                itemId: itemId
-              })
-            });
-            
-            showNotification(`Activated ${itemData.name} for ${formatDuration(itemData.duration)}`);
-          }
-          break;
-          
-        case "reset_daily":
-          // Reset daily quests
-          transaction.update(playerRef, {
-            inventory: inventory.filter((_, index) => index !== itemIndex)
-          });
-          
-          // Call function to reset daily quests
-          resetDailyQuests();
-          showNotification("Daily quests have been reset");
-          break;
-          
-        default:
-          // For consumable items without special handling, just remove from inventory
-          if (itemData.consumable) {
-            transaction.update(playerRef, {
-              inventory: inventory.filter((_, index) => index !== itemIndex)
-            });
-            
-            showNotification(`Used ${itemData.name}`);
-          } else {
-            throw new Error("This item cannot be used");
-          }
-      }
+    // Remove item from inventory
+    await playerRef.update({
+      inventory: firebase.firestore.FieldValue.arrayRemove(inventoryItem),
     });
-    
-    // Play sound effect
-    notificationSystem.playSound("item_use");
-    
-    // Update UI
-    updateStatusBar();
-    await windowSystem.updateInventoryWindow();
-    
+
+    // Update local stats
+    playerStats.inventory = playerStats.inventory.filter(
+      (item) => item.id !== itemId
+    );
+
+    showNotification("Item used successfully!");
+    windowSystem.updateWindowContent("inventoryWindow");
   } catch (error) {
-    console.error("Error using item:", error);
-    showNotification(error.message, "error");
+    printToTerminal("Error using item: " + error.message, "error");
   }
-};
+}
 
 // Make functions available to the window
 window.useItem = useItem;
@@ -6770,10 +6101,6 @@ async function handlePenaltyCommand(args) {
     const levelsLost = currentLevel - newLevel;
     const now = firebase.firestore.Timestamp.now();
 
-    if (levelsLost > 0) {
-      showLevelDownAnimation(currentLevel, newLevel);
-    }
-
     // Update player stats
     await playerRef.update({
       exp: newExp,
@@ -6996,14 +6323,9 @@ const audioSystem = {
   }
 };
 
-// Also modify handleLevelUp to use our animation
+// Modify the levelUp notification to include voice line
 function handleLevelUp(levelsGained) {
-  const newLevel = playerStats.level;
-  const previousLevel = newLevel - levelsGained;
-  
-  // Show level-up animation
-  showLevelUpAnimation(previousLevel, newLevel);
-  
+  // ... existing level up code ...
   audioSystem.playVoiceLine('LEVEL_UP');
 }
 
@@ -7026,17 +6348,9 @@ function handlePenalty() {
   audioSystem.playVoiceLine('PENALTY');
 }
 
-// Add this function to trigger the rank up animation
-function handleRankUp(previousRank, newRank) {
-  showRankUpAnimation(previousRank, newRank);
-  
-  // Add notification
-  showNotification(`Congratulations! You've been promoted to Rank ${newRank}!`, "achievement");
-  
-  // Print to terminal
-  printToTerminal(`⭐ You have been promoted to Rank ${newRank}! ⭐`, "achievement");
+function handleRankUp() {
+  audioSystem.playVoiceLine('RANK_UP');
 }
-
 
 function handleStreakMilestone() {
   audioSystem.playVoiceLine('STREAK');
@@ -7119,67 +6433,64 @@ async function showRankProgress() {
     // Define consistent blue color scheme with different shapes for ranks
     const rankStyles = {
       E: {
-        shape: "polygon(50% 0%, 100% 86%, 0% 86%)", // Simple triangle
-        edges: 3,
-        border: "#88b0d0",
-        glow: "rgba(136, 176, 208, 0.3)",
-        baseColor: "#88b0d0",
-        intensity: 0.1,
+        shape: "polygon(50% 0%, 95% 25%, 95% 75%, 50% 100%, 5% 75%, 5% 25%)", // Basic hexagon
+        edges: 6,
+        border: "#00a2ff",
+        glow: "rgba(0, 162, 255, 0.4)",
+        baseColor: "#00a2ff",
+        intensity: 0.2,
         particleCount: 0,
         animation: ""
       },
       D: {
-        shape: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)", // Diamond/square
-        edges: 4,
-        border: "#66b8e0",
-        glow: "rgba(102, 184, 224, 0.4)",
-        baseColor: "#66b8e0",
-        intensity: 0.2,
-        particleCount: 2,
+        shape: "polygon(50% 0%, 95% 25%, 95% 75%, 50% 100%, 5% 75%, 5% 25%)", // Basic hexagon with inner hexagon
+        edges: 6,
+        border: "#00a2ff",
+        glow: "rgba(0, 162, 255, 0.5)",
+        baseColor: "#00a8ff",
+        intensity: 0.25,
+        particleCount: 3,
         animation: ""
       },
       C: {
-        shape: "polygon(50% 0%, 95% 35%, 80% 90%, 20% 90%, 5% 35%)", // Pentagon
-        edges: 5,
-        border: "#44c0f0",
-        glow: "rgba(68, 192, 240, 0.5)",
-        baseColor: "#44c0f0",
-        intensity: 0.25,
-        particleCount: 4,
-        animation: "pulseSoft 4s infinite"
-      },
-      B: {
-        shape: "polygon(50% 0%, 85% 25%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 15% 25%)", // Hexagon
+        shape: "polygon(50% 0%, 100% 25%, 93% 75%, 50% 100%, 7% 75%, 0% 25%)", // More angled hexagon
         edges: 6,
-        border: "#22c8ff",
-        glow: "rgba(34, 200, 255, 0.6)",
-        baseColor: "#22c8ff", 
-        intensity: 0.35,
-        particleCount: 6,
+        border: "#00a8ff",
+        glow: "rgba(0, 168, 255, 0.6)",
+        baseColor: "#00a8ff",
+        intensity: 0.3,
+        particleCount: 5,
         animation: "pulseSoft 3s infinite"
       },
+      B: {
+        shape: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)", // More defined hexagon
+        edges: 6,
+        border: "#00b8ff",
+        glow: "rgba(0, 184, 255, 0.7)",
+        baseColor: "#00b8ff",
+        intensity: 0.35,
+        particleCount: 8,
+        animation: "pulseSoft 2.5s infinite"
+      },
       A: {
-        shape: "polygon(50% 0%, 75% 15%, 100% 40%, 95% 75%, 70% 100%, 30% 100%, 5% 75%, 0% 40%, 25% 15%)", // Octagon
-        edges: 8,
-        border: "linear-gradient(45deg, #00c8ff, #00a0ff)",
-        glow: "rgba(0, 200, 255, 0.7)",
-        baseColor: "linear-gradient(135deg, #00c8ff, #0080ff)",
-        intensity: 0.5,
-        particleCount: 10,
-        animation: "pulseBright 2.5s infinite",
-        shadow: "0 0 10px rgba(0, 160, 255, 0.4)"
+        shape: "polygon(50% 0%, 100% 20%, 100% 80%, 50% 100%, 0% 80%, 0% 20%)", // Stretched hexagon
+        edges: 6,
+        border: "#00c8ff",
+        glow: "rgba(0, 200, 255, 0.8)",
+        baseColor: "#00c8ff",
+        intensity: 0.4,
+        particleCount: 12,
+        animation: "pulseBright 2s infinite"
       },
       S: {
-        shape: "polygon(50% 0%, 72% 10%, 90% 30%, 100% 55%, 90% 80%, 65% 100%, 35% 100%, 10% 80%, 0% 55%, 10% 30%, 28% 10%)", // Complex star-like shape with 9 points
-        edges: 9,
-        border: "linear-gradient(45deg, #5000ff, #00d8ff, #ff00d0)",
-        glow: "rgba(128, 0, 255, 0.8)",
-        baseColor: "linear-gradient(135deg, #7700ff, #00d8ff)",
-        intensity: 0.8,
-        particleCount: 24,
-        animation: "pulseRank 1.2s infinite",
-        shadow: "0 0 20px rgba(128, 0, 255, 0.5), 0 0 40px rgba(80, 0, 255, 0.3)",
-        specialEffects: true
+        shape: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%, 50% 50%)", // Star-like shape
+        edges: 8,
+        border: "#00d8ff",
+        glow: "rgba(0, 216, 255, 0.9)",
+        baseColor: "#00d8ff",
+        intensity: 0.5,
+        particleCount: 16,
+        animation: "pulseBright 1.5s infinite, rotateHex 10s linear infinite"
       }
     };
 
@@ -7408,7 +6719,7 @@ async function showRankProgress() {
           height: 80px;
         }
         
-        .sl-rank-container .sl-rank-hex  {
+        .sl-rank-hex {
           width: 70px;
           height: 70px;
           background: #0a1428;
@@ -7816,17 +7127,12 @@ async function showRankProgress() {
 async function checkAndUpdateRank(playerRef, player) {
   const rankProgress = checkRankProgress(player);
   if (rankProgress.nextRank && rankProgress.progress.overall >= 100) {
-    // Store the current rank before updating it
-    const previousRank = player.rank; // Add this line
     const newRank = rankProgress.nextRank;
 
     await playerRef.update({
       rank: newRank,
     });
-    
-    // Now previousRank is properly defined
-    handleRankUp(previousRank, newRank);
-    
+
     // Update local stats
     playerStats.rank = newRank;
 
@@ -7853,6 +7159,7 @@ async function checkAndUpdateRank(playerRef, player) {
   }
   return false;
 }
+
 function checkRankProgress(player) {
   const currentRank = player.rank || "E";
   
@@ -8412,7 +7719,8 @@ export class SoloAISystem {
     this.visualizer = null;
     this.speechRecognition = null;
     
-    this.openRouterKey = CONFIG.OPENROUTER_API_KEY;
+    this.TENOR_API_KEY = "AIzaSyAspeCpFUpSuZFurXhetczSrxRQIba7tYo"; // Your provided Tenor API key
+    this.openRouterKey = "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";
 
     this.initUI();
     this.initialize();
@@ -8431,387 +7739,144 @@ export class SoloAISystem {
       processingStatus: document.getElementById('processingStatus'),
     };
 
-    // Make sure buttons exist before adding event listeners
-    if (this.elements.startListeningBtn) {
-      this.elements.startListeningBtn.addEventListener('click', () => this.startListening());
-    } else {
-      console.error("Start listening button not found in DOM");
-    }
-    
-    if (this.elements.stopListeningBtn) {
-      this.elements.stopListeningBtn.addEventListener('click', () => this.stopListening());
-    } else {
-      console.error("Stop listening button not found in DOM");
-    }
-    
-    if (this.elements.clearChatBtn) {
-      this.elements.clearChatBtn.addEventListener('click', () => {
-        if (this.elements.transcript) {
-          this.elements.transcript.innerHTML = '';
-          this.conversation = [];
-        }
-      });
-    }
+    this.elements.startListeningBtn.addEventListener('click', () => this.startListening());
+    this.elements.stopListeningBtn.addEventListener('click', () => this.stopListening());
   }
 
   async initialize() {
     this.updateDebug('system', 'Initializing Solo AI System...');
 
     try {
-      // Initialize audio context
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
       this.updateDebug('system', 'Audio context initialized');
-      
-      // Initialize visualizer
-      this.visualizer = new ThreeJSVisualizer(this.audioContext);
-      this.updateDebug('system', 'Visualizer initialized');
-      
-      // Initialize speech recognition
-      if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        this.speechRecognition = new SpeechRecognition();
-        this.speechRecognition.continuous = true;
-        this.speechRecognition.interimResults = true;
-        this.speechRecognition.lang = 'en-US';
-        
-        this.speechRecognition.onstart = () => {
-          this.listening = true;
-          this.updateListeningUI(true);
-          this.updateDebug('speech', 'Speech recognition started');
-          console.log("Speech recognition started successfully");
-        };
-        
-        this.speechRecognition.onend = () => {
-          console.log("Speech recognition ended, listening state:", this.listening);
-          if (this.listening) {
-            // Try to restart if we're still supposed to be listening
-            try {
-              this.speechRecognition.start();
-              this.updateDebug('speech', 'Speech recognition restarted');
-            } catch (err) {
-              console.error("Failed to restart speech recognition:", err);
-              this.listening = false;
-              this.updateListeningUI(false);
-            }
-          } else {
-            this.updateListeningUI(false);
-            this.updateDebug('speech', 'Speech recognition stopped');
-          }
-        };
-        
-        this.speechRecognition.onresult = (event) => {
-          const result = event.results[event.results.length - 1];
-          if (result.isFinal) {
-            const transcript = result[0].transcript.trim();
-            if (transcript) {
-              console.log("Recognized speech:", transcript);
-              this.handleUserInput(transcript);
-            }
-          }
-        };
-        
-        this.speechRecognition.onerror = (event) => {
-          console.error("Speech recognition error:", event.error);
-          this.updateDebug('speech', 'Speech recognition error: ' + event.error);
-          if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-            this.addMessage('system', 'Microphone access denied. Please allow microphone access in your browser settings.');
-            this.listening = false;
-            this.updateListeningUI(false);
-          }
-        };
-        
-        this.updateDebug('speech', 'Speech recognition initialized');
-      } else {
-        this.updateDebug('speech', 'Speech recognition not supported in this browser');
-        this.addMessage('system', 'Speech recognition is not supported in your browser.');
-      }
-      
-      this.initialized = true;
-      this.updateDebug('system', 'SOLO AI System initialized and ready');
-      
     } catch (error) {
-      console.error("Error initializing SOLO AI system:", error);
-      this.updateDebug('system', 'Error initializing: ' + error.message);
+      this.updateDebug('system', 'Error initializing audio context: ' + error.message);
     }
-  }
-  async startListening() {
-    console.log("Start listening called, initialized:", this.initialized);
-    
-    if (!this.initialized) {
-      try {
-        await this.initialize();
-      } catch (error) {
-        this.addMessage('system', 'Failed to initialize. Please refresh and try again.');
-        return;
-      }
-    }
-  
-    if (!this.speechRecognition) {
-      this.addMessage('system', 'Speech recognition not available in your browser');
-      return;
-    }
-  
-    if (this.listening) {
-      console.log("Already listening, no need to start again");
-      return;
-    }
-  
-    try {
-      console.log("Requesting microphone permission...");
-      
-      // Reset restart attempts counter
-      this.restartAttempts = 0;
-      
-      // Force a permission request by trying to access the microphone
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      // Stop the stream immediately, we just needed the permission
-      stream.getTracks().forEach(track => track.stop());
-      
-      // Start speech recognition
-      this.listening = true;
-      this.updateListeningUI(true);
-      
-      try {
-        this.speechRecognition.start();
-        console.log("Speech recognition started");
-        // Remove this line to prevent duplication - the onstart handler will show the message
-        // this.addMessage('system', 'Listening... speak now');
-      } catch (err) {
-        console.error("Error starting speech recognition:", err);
-        
-        // If already started, don't show error
-        if (err.name === 'InvalidStateError' && err.message.includes('already started')) {
-          console.log("Speech recognition was already running");
-        } else {
-          this.addMessage('system', 'Error starting speech recognition: ' + err.message);
-          this.listening = false;
-          this.updateListeningUI(false);
-        }
-      }
-    } catch (error) {
-      console.error("Microphone permission error:", error);
-      this.addMessage('system', 'Microphone access denied. Please allow microphone access and try again.');
-      this.listening = false;
-      this.updateListeningUI(false);
-    }
-  }
 
-  stopListening() {
-    console.log("Stop listening called, current state:", this.listening);
-    
-    // Clear any pending restart timeout
-    if (this.restartTimeout) {
-      clearTimeout(this.restartTimeout);
-      this.restartTimeout = null;
-    }
-    
-    // Reset state
-    this.listening = false;
-    this.restartAttempts = 0;
-    
-    if (this.speechRecognition) {
-      try {
-        this.speechRecognition.stop();
-        console.log("Speech recognition stopped");
-      } catch (err) {
-        console.error("Error stopping speech recognition:", err);
-        
-        // Force recreation of the recognition object if we can't stop it
-        if (err.name === 'InvalidStateError') {
-          console.log("Recreating speech recognition object");
-          this.recreateSpeechRecognition();
-        }
-      }
-    }
-    
-    this.updateListeningUI(false);
-    this.updateDebug('speech', 'Microphone deactivated');
-  }
+    this.visualizer = new ThreeJSVisualizer(this.audioContext);
+    this.updateDebug('system', 'Visualizer initialized');
 
-  // Add new method to recreate the speech recognition object
-  recreateSpeechRecognition() {
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      
-      // Remove old event listeners if possible
-      if (this.speechRecognition) {
-        this.speechRecognition.onstart = null;
-        this.speechRecognition.onend = null;
-        this.speechRecognition.onresult = null;
-        this.speechRecognition.onerror = null;
-      }
-      
-      // Create new recognition object
       this.speechRecognition = new SpeechRecognition();
       this.speechRecognition.continuous = true;
       this.speechRecognition.interimResults = true;
-      this.speechRecognition.lang = 'en-US';
-      
-      // Set up event handlers
+
       this.speechRecognition.onstart = () => {
         this.listening = true;
         this.updateListeningUI(true);
         this.updateDebug('speech', 'Speech recognition started');
-        console.log("Speech recognition started successfully");
       };
-      
+// Add permission check
+navigator.mediaDevices.getUserMedia({ audio: true })
+.then(stream => {
+    stream.getTracks().forEach(track => track.stop());
+    this.updateDebug('speech', 'Microphone access granted');
+})
+.catch(err => {
+    this.updateDebug('speech', `Microphone access denied: ${err.message}`);
+    this.addMessage('system', 'Please allow microphone access in your browser settings');
+});
       this.speechRecognition.onend = () => {
-        console.log("Speech recognition ended, listening state:", this.listening);
-        
-        // Only try to restart if we're supposed to be listening
         if (this.listening) {
-          // Only attempt to restart if we haven't exceeded the maximum attempts
-          if (this.restartAttempts < this.maxRestartAttempts) {
-            this.restartAttempts++;
-            console.log(`Restart attempt ${this.restartAttempts}/${this.maxRestartAttempts}`);
-            
-            // Add increasing delay between restart attempts
-            const delay = 300 * this.restartAttempts;
-            this.updateDebug('speech', `Will restart in ${delay}ms, attempt ${this.restartAttempts}`);
-            
-            // Clear any existing timeout
-            if (this.restartTimeout) {
-              clearTimeout(this.restartTimeout);
-            }
-            
-            // Set new timeout
-            this.restartTimeout = setTimeout(() => {
-              if (this.listening) {
-                try {
-                  this.speechRecognition.start();
-                  this.updateDebug('speech', 'Speech recognition restarted');
-                } catch (err) {
-                  console.error("Failed to restart speech recognition:", err);
-                  // If we can't restart, give up
-                  if (this.restartAttempts >= this.maxRestartAttempts) {
-                    console.log("Giving up on restarting speech recognition");
-                    this.listening = false;
-                    this.updateListeningUI(false);
-                    this.addMessage('system', 'Speech recognition failed to restart. Please try again.');
-                  }
-                }
-              }
-            }, delay);
-          } else {
-            // If we've exceeded the maximum attempts, give up
-            console.log("Maximum restart attempts exceeded");
-            this.listening = false;
-            this.updateListeningUI(false);
-          }
+          this.speechRecognition.start();
+          this.updateDebug('speech', 'Speech recognition restarted');
         } else {
           this.updateListeningUI(false);
           this.updateDebug('speech', 'Speech recognition stopped');
         }
       };
-      
+
       this.speechRecognition.onresult = (event) => {
-        // Reset restart counter on successful results
-        this.restartAttempts = 0;
-        
         const result = event.results[event.results.length - 1];
         if (result.isFinal) {
           const transcript = result[0].transcript.trim();
           if (transcript) {
-            console.log("Recognized speech:", transcript);
             this.handleUserInput(transcript);
           }
         }
       };
-      
+
       this.speechRecognition.onerror = (event) => {
-        console.error("Speech recognition error:", event.error);
         this.updateDebug('speech', 'Speech recognition error: ' + event.error);
-        
-        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-          this.addMessage('system', 'Microphone access denied. Please allow microphone access in your browser settings.');
-          this.listening = false;
-          this.updateListeningUI(false);
-        } else if (event.error === 'aborted') {
-          // Do nothing, this is expected when stopping
-        } else {
-          // Increment restart counter on other errors
-          this.restartAttempts++;
-        }
       };
-      
-      console.log("Speech recognition object recreated");
+
+      this.updateDebug('speech', 'Speech recognition initialized');
+    } else {
+      this.updateDebug('speech', 'Speech recognition not supported in this browser');
+    }
+
+    this.initialized = true;
+    this.updateDebug('system', 'SOLO AI System initialized and ready');
+  }
+
+  async startListening() {
+    if (!this.initialized) {
+        await this.initialize();
+        return;
+    }
+
+    if (!this.speechRecognition) {
+        this.addMessage('system', 'Speech recognition not available');
+        return;
+    }
+
+    try {
+        // Check microphone permission explicitly
+        const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
+        if (permissionStatus.state === 'denied') {
+            this.addMessage('system', 'Microphone permission denied. Please enable it in browser settings');
+            return;
+        }
+
+        this.listening = true;
+        this.speechRecognition.start();
+        this.updateListeningUI(true);
+        this.updateDebug('speech', 'Microphone activated');
+    } catch (error) {
+        this.updateDebug('speech', `Start listening failed: ${error.message}`);
+        this.addMessage('system', `Microphone error: ${error.message}`);
+        this.listening = false;
+        this.updateListeningUI(false);
+    }
+}
+
+stopListening() {
+    if (this.speechRecognition && this.listening) {
+        try {
+            this.listening = false;
+            this.speechRecognition.stop();
+            this.updateListeningUI(false);
+            this.updateDebug('speech', 'Microphone deactivated');
+        } catch (error) {
+            this.updateDebug('speech', `Stop listening failed: ${error.message}`);
+        }
+    }
+}
+
+  stopListening() {
+    if (this.speechRecognition) {
+      this.listening = false;
+      this.speechRecognition.stop();
+      this.elements.startListeningBtn.style.display = 'flex';
+      this.elements.stopListeningBtn.style.display = 'none';
+      this.elements.listeningIndicator.classList.remove('active');
+      this.elements.listeningStatus.classList.remove('active');
     }
   }
 
-  // Remove the duplicate updateListeningUI and keep only this version
   updateListeningUI(isListening) {
-    if (!this.elements) return;
-    
-    // Update status indicators
-    if (this.elements.listeningStatus) {
-      this.elements.listeningStatus.className = isListening ? 'status-dot active' : 'status-dot inactive';
-    }
-    
-    if (this.elements.listeningIndicator) {
-      if (isListening) {
-        this.elements.listeningIndicator.classList.add('active');
-      } else {
-        this.elements.listeningIndicator.classList.remove('active');
-      }
-    }
-    
-    // Update button visibility
-    if (this.elements.startListeningBtn) {
-      this.elements.startListeningBtn.style.display = isListening ? 'none' : 'flex';
-    }
-    
-    if (this.elements.stopListeningBtn) {
-      this.elements.stopListeningBtn.style.display = isListening ? 'flex' : 'none';
-    }
-    
-    // Update visualizer if it exists
-    if (this.visualizer) {
-      this.visualizer.setActiveMode(isListening);
-    }
-    
-    console.log("UI updated, listening state:", isListening);
+    this.elements.listeningStatus.className = isListening ? 'status-dot active' : 'status-dot inactive';
+    this.elements.listeningIndicator.classList.toggle('active', isListening);
+    this.elements.startListeningBtn.style.display = isListening ? 'none' : 'flex';
+    this.elements.stopListeningBtn.style.display = isListening ? 'flex' : 'none';
   }
 
   updateProcessingUI(isProcessing) {
     this.processing = isProcessing;
-    if (!this.elements) return;
-    
-    if (this.elements.processingStatus) {
-      this.elements.processingStatus.className = isProcessing ? 'status-dot active' : 'status-dot inactive';
-    }
-    
-    if (this.elements.thinkingIndicator) {
-      this.elements.thinkingIndicator.classList.toggle('active', isProcessing);
-    }
-    
-    if (this.visualizer) {
-      this.visualizer.setProcessingMode(isProcessing);
-    }
-  }
-
-  async initialize() {
-    this.updateDebug('system', 'Initializing Solo AI System...');
-
-    try {
-      // Initialize audio context
-      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      this.updateDebug('system', 'Audio context initialized');
-      
-      // Initialize visualizer
-      this.visualizer = new ThreeJSVisualizer(this.audioContext);
-      this.updateDebug('system', 'Visualizer initialized');
-      
-      // Initialize speech recognition
-      this.recreateSpeechRecognition();
-      
-      this.initialized = true;
-      this.updateDebug('system', 'SOLO AI System initialized and ready');
-      
-    } catch (error) {
-      console.error("Error initializing SOLO AI system:", error);
-      this.updateDebug('system', 'Error initializing: ' + error.message);
-    }
+    this.elements.processingStatus.className = isProcessing ? 'status-dot active' : 'status-dot inactive';
+    this.elements.thinkingIndicator.classList.toggle('active', isProcessing);
+    this.visualizer.setProcessingMode(isProcessing);
   }
 
   extractQuestDetails(text) {
@@ -9289,85 +8354,64 @@ export class SoloAISystem {
 
   async speakResponse(text) {
     try {
-      this.updateDebug('audio', 'Using robotic speech synthesis...');
-      
-      // Add to conversation history
-      this.conversation.push({ type: 'ai', text });
-      
-      // Create a new message element with typewriter effect
+      this.updateDebug('audio', 'Requesting speech from Azure TTS API...');
+      const tokenResponse = await fetch(`https://eastus.api.cognitive.microsoft.com/sts/v1.0/issuetoken`, {
+        method: 'POST',
+        headers: {
+          'Ocp-Apim-Subscription-Key': "FANcfK9JLli9bfNboMTIVRIhY3a6BJJf1ifjGP4gUwylRN00Bez0JQQJ99BCACYeBjFXJ3w3AAAYACOG4YgF"
+        }
+      });
+
+      if (!tokenResponse.ok) {
+        throw new Error(`Failed to get token: ${tokenResponse.status}`);
+      }
+
+      const accessToken = await tokenResponse.text();
+      const ttsUrl = `https://eastus.tts.speech.microsoft.com/cognitiveservices/v1`;
+
+      const audioResponse = await fetch(ttsUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/ssml+xml',
+          'X-Microsoft-OutputFormat': 'audio-16khz-32kbitrate-mono-mp3'
+        },
+        body: `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>
+                 <voice name='en-US-AriaNeural'>${text}</voice>
+               </speak>`
+      });
+
+      if (!audioResponse.ok) {
+        throw new Error(`Azure TTS request failed with status ${audioResponse.status}`);
+      }
+
+      const audioBlob = await audioResponse.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+
+      const source = this.audioContext.createMediaElementSource(audio);
+      source.connect(this.audioContext.destination);
+      source.connect(this.visualizer.analyzer);
+
+      this.visualizer.setActiveMode(true);
+      audio.onended = () => {
+        this.visualizer.setActiveMode(false);
+        source.disconnect();
+      };
+
       const messageElement = document.createElement('div');
-      messageElement.style.marginBottom = '10px';
       messageElement.innerHTML = `<strong>AI:</strong> `;
       this.elements.transcript.appendChild(messageElement);
       this.elements.transcript.scrollTop = this.elements.transcript.scrollHeight;
-      
-      // Start typing animation
+
       typeWriter(text, messageElement, 250);
-      
-      // Create a speech synthesis utterance
-      const utterance = new SpeechSynthesisUtterance(text);
-      
-      // Modify voice to sound robotic
-      utterance.pitch = 0.1;       // Lower pitch for mechanical sound
-      utterance.rate = 1.1;       // Slightly slower to sound more rigid
-      utterance.volume = 1;
-      
-      // Add roboticity by inserting subtle pauses between some words
-      const roboticText = text.replace(/\. /g, '... ').replace(/\, /g, '... ');
-      utterance.text = roboticText;
-      
-      // Get available voices
-      const voices = window.speechSynthesis.getVoices();
-      // Try to find a more mechanical/neutral sounding voice
-      const roboticVoice = voices.find(voice => 
-        voice.name.includes('Microsoft') || 
-        voice.name.includes('Google') || 
-        voice.name.includes('English') ||
-        voice.name.includes('US')
-      );
-      
-      if (roboticVoice) {
-        utterance.voice = roboticVoice;
-      }
-      
-      // Connect to visualizer if available
-      if (this.visualizer) {
-        this.visualizer.setActiveMode(true);
-      }
-      
-      // Event handlers
-      utterance.onstart = () => {
-        this.updateDebug('audio', 'Robotic speech started');
-      };
-      
-      utterance.onend = () => {
-        this.updateDebug('audio', 'Robotic speech completed');
-        if (this.visualizer) {
-          this.visualizer.setActiveMode(false);
-        }
-      };
-      
-      utterance.onerror = (event) => {
-        console.error('Speech synthesis error:', event);
-        this.updateDebug('audio', 'Speech error: ' + event.error);
-      };
-      
-      // Speak the text
-      window.speechSynthesis.speak(utterance);
-      
-      // Don't call addMessage here to avoid duplication
-      
+      await audio.play();
     } catch (error) {
+      this.updateDebug('audio', 'Error generating or playing speech: ' + error.message);
       console.error('Speech synthesis error:', error);
-      this.updateDebug('audio', 'Error generating speech: ' + error.message);
-      
-      // In case of error, we still need to make sure the message appears
-      // But check if it's already in the conversation to avoid duplication
-      if (!this.conversation.some(msg => msg.type === 'ai' && msg.text === text)) {
-        this.addMessage('ai', text);
-      }
     }
   }
+
   addMessage(type, text) {
     if (this.conversation.length > 0 && this.conversation[this.conversation.length - 1].text === text) {
       return;
@@ -9988,35 +9032,22 @@ async function applyDailyPenalties() {
       } else if (currentIntake > dailyGoalCups) {
         // Award for exceeding water goal
         const exceedPercentage = Math.floor(((currentIntake - dailyGoalCups) / dailyGoalCups) * 100);
-        // Base reward of 50 multiplied by the exceed percentage (as a decimal)
-        const waterReward = Math.min(Math.floor(50 + (exceedPercentage * 0.5)), 100);
+        // Base reward could be calculated based on percentage
+        const waterReward = Math.floor(exceedPercentage);
         rewards += waterReward;
         rewardDetails.push(`You exceeded your water intake goal by ${exceedPercentage}%: +${waterReward} XP`);
       }
     }
     
+    // Apply penalties if needed
     if (totalPenalty > 0) {
       // Calculate new exp after penalty
       const currentExp = player.exp || 0;
       const currentLevel = player.level || 1;
       
-      // Calculate new level based on experience reduction
-      let newExp = currentExp - totalPenalty;
-      let newLevel = currentLevel;
-    
-      // Adjust level if experience goes negative
-      while (newExp < 0 && newLevel > 1) {
-        newLevel--;
-        newExp += getExpNeededForLevel(newLevel);
-      }
-      if (newLevel === 1 && newExp < 0) newExp = 0;
-      
-      const levelsLost = currentLevel - newLevel;
-
       // Submit the penalty
       await playerRef.update({
-        exp: newExp,
-        level: newLevel,
+        exp: firebase.firestore.FieldValue.increment(-totalPenalty),
         "penalties.lastPenalty": {
           amount: totalPenalty,
           timestamp: firebase.firestore.FieldValue.serverTimestamp(),
@@ -10030,20 +9061,16 @@ async function applyDailyPenalties() {
         type: "penalty",
         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
         read: false,
-        message: `Daily Penalty: Lost ${totalPenalty} XP${levelsLost > 0 ? ` and ${levelsLost} level${levelsLost > 1 ? 's' : ''}` : ''}.`,
+        message: `Daily Penalty: Lost ${totalPenalty} XP`,
         details: {
           penaltyAmount: totalPenalty,
-          reasons: penaltyDetails,
-          previousLevel: currentLevel,
-          newLevel: newLevel,
-          levelsLost: levelsLost
+          reasons: penaltyDetails
         },
       });
       
       // Update local stats
       if (playerStats) {
-        playerStats.exp = newExp;
-        playerStats.level = newLevel;
+        playerStats.exp = Math.max(0, playerStats.exp - totalPenalty);
       }
       
       // Display penalty details
@@ -11820,16 +10847,12 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeDailyQuestsWindow();
   }
 });
+
 // Add near your other command handlers
 async function checkRecentPenalties() {
   if (!isAuthenticated) return;
 
   try {
-    // Check if we've already shown the penalty this session
-    if (sessionStorage.getItem('penaltyShown')) {
-      return;
-    }
-
     const playerRef = db.collection('players').doc(currentUser.uid);
     const playerDoc = await playerRef.get();
     const playerData = playerDoc.data();
@@ -11843,131 +10866,18 @@ async function checkRecentPenalties() {
       if (penaltyTime.getDate() === now.getDate() &&
           penaltyTime.getMonth() === now.getMonth() &&
           penaltyTime.getFullYear() === now.getFullYear()) {
-        // printToTerminal(`[PENALTY NOTICE] You received a penalty of -${lastPenalty.amount} XP`, 'warning');
+        printToTerminal(`[PENALTY NOTICE] You received a penalty of -${lastPenalty.amount} XP`, 'warning');
         lastPenalty.details.forEach(detail => {
           printToTerminal(detail, 'warning');
         });
-        
-        // Mark that we've shown the penalty for this session
-        sessionStorage.setItem('penaltyShown', 'true');
       }
     }
   } catch (error) {
     console.error('Error checking penalties:', error);
   }
 }
-// Add this function to simulate daily penalties for testing
-async function simulateDailyPenalty() {
-  if (!isAuthenticated) {
-    printToTerminal("You must !reawaken first.", "error");
-    return;
-  }
 
-  try {
-    const playerRef = db.collection("players").doc(currentUser.uid);
-    const playerDoc = await playerRef.get();
-    const player = playerDoc.data();
-    
-    if (!player) return;
-    
-    // Simulate penalty values
-    const totalPenalty = 150;
-    const penaltyDetails = [
-      "You didn't complete 1 daily quest: -50 XP",
-      "You didn't reach your water intake goal (0/15): -100 XP"
-    ];
-    
-    // Calculate new exp after penalty
-    const currentExp = player.exp || 0;
-    const currentLevel = player.level || 1;
-    
-    // Calculate new level based on experience reduction
-    let newExp = currentExp - totalPenalty;
-    let newLevel = currentLevel;
-
-    // Adjust level if experience goes negative
-    while (newExp < 0 && newLevel > 1) {
-      newLevel--;
-      newExp += getExpNeededForLevel(newLevel);
-    }
-    if (newLevel === 1 && newExp < 0) newExp = 0;
-    
-    const levelsLost = currentLevel - newLevel;
-    
-    // Submit the penalty
-    await playerRef.update({
-      exp: newExp,
-      level: newLevel,
-      "penalties.lastPenalty": {
-        amount: totalPenalty,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-        details: penaltyDetails
-      }
-    });
-    
-    // Create notification for penalties
-    await db.collection("notifications").add({
-      userId: currentUser.uid,
-      type: "penalty",
-      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-      read: false,
-      message: `Daily Penalty: Lost ${totalPenalty} XP${levelsLost > 0 ? ` and ${levelsLost} level${levelsLost > 1 ? 's' : ''}` : ''}.`,
-      details: {
-        penaltyAmount: totalPenalty,
-        reasons: penaltyDetails,
-        previousLevel: currentLevel,
-        newLevel: newLevel,
-        levelsLost: levelsLost
-      },
-    });
-    
-    // Update local stats
-    if (playerStats) {
-      playerStats.exp = newExp;
-      playerStats.level = newLevel;
-    }
-
-    if (levelsLost > 0) {
-      showLevelDownAnimation(currentLevel, newLevel);
-    }
-    
-    // Clear any existing session storage
-    sessionStorage.removeItem('penaltyShown');
-    
-    // Display penalty details
-    printToTerminal("=== SIMULATED DAILY PENALTIES APPLIED ===", "error");
-    penaltyDetails.forEach(detail => {
-      printToTerminal(detail, "error");
-    });
-    printToTerminal(`Total Penalty: -${totalPenalty} XP`, "error");
-    
-    if (levelsLost > 0) {
-      printToTerminal(`You lost ${levelsLost} level(s)!`, "error");
-      printToTerminal(`Previous Level: ${currentLevel}`, "info");
-      printToTerminal(`New Level: ${newLevel}`, "info");
-    }
-    
-    // Update UI
-    updateStatusBar();
-    windowSystem.updateWindowContent("profileWindow");
-    windowSystem.updateWindowContent("notificationsWindow");
-    
-    // Play penalty voice line
-    handlePenalty();
-    
-  } catch (error) {
-    console.error("Error simulating daily penalties:", error);
-    printToTerminal("Error simulating daily penalties: " + error.message, "error");
-  }
-}
-// Initialize the animation styles when the app loads
-document.addEventListener('DOMContentLoaded', function() {
-  // Add with other style initialization functions
-  addLevelDownAnimationStyles();
-});
-
-// Register the command
-commands['!simulatepenalty'] = simulateDailyPenalty;
+commands['!penalties'] = checkRecentPenalties;
 
 // Add this function to create particle effects for windows
 function initializeParticleEffects() {
@@ -12479,6 +11389,7 @@ function initializeQuestSuggestionSystem() {
     showSuggestionWindow();
   });
   
+  // Rest of the function remains the same...
   
   // Add generate button click handler
   const generateBtn = document.getElementById('generateSuggestionBtn');
@@ -12486,21 +11397,19 @@ function initializeQuestSuggestionSystem() {
     generateBtn.addEventListener('click', generateQuestSuggestion);
   }
   
-// Then modify the closeBtn event listener (around line 12485)
-const closeBtn = suggestWindow.querySelector('.window-close');
-if (closeBtn) {
-  closeBtn.addEventListener('click', () => {
-    console.log('Close button clicked');
-    // First set display to 'none' directly
-    suggestWindow.style.display = 'none';
-    // Then handle windowSystem if available
-    if (typeof windowSystem !== 'undefined' && windowSystem.closeWindow) {
-      windowSystem.closeWindow('suggestQuestWindow');
-    } else {
-      suggestWindow.classList.remove('show');
-    }
-  });
-}
+  // Add window controls functionality
+  const closeBtn = suggestWindow.querySelector('.window-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      console.log('Close button clicked');
+      if (typeof windowSystem !== 'undefined' && windowSystem.closeWindow) {
+        windowSystem.closeWindow('suggestQuestWindow');
+      } else {
+        suggestWindow.style.display = 'none';
+        suggestWindow.classList.remove('show');
+      }
+    });
+  }
   
   const minimizeBtn = suggestWindow.querySelector('.window-minimize');
   if (minimizeBtn) {
@@ -12539,6 +11448,7 @@ async function loadSavedSuggestionText() {
     console.error("Error loading saved suggestion text:", error);
   }
 }
+
 async function saveSuggestionText(text) {
   if (!currentUser || !text) return;
   
@@ -12552,6 +11462,7 @@ async function saveSuggestionText(text) {
     console.error("Error saving suggestion text:", error);
   }
 }
+// Replace the generateQuestSuggestion function with this more robust version
 async function generateQuestSuggestion() {
   const goalsText = document.getElementById('suggestionGoalsText').value.trim();
   const questType = document.querySelector('input[name="questType"]:checked').value;
@@ -12562,111 +11473,125 @@ async function generateQuestSuggestion() {
     return;
   }
   
+  // Save the suggestion text for future use
   await saveSuggestionText(goalsText);
   
+  // Show loading indicator
   resultsContainer.innerHTML = '<div class="loading-spinner"><div class="spinner"></div><p>Generating suggestions...</p></div>';
   
   try {
+    // Get player data for context
     const playerRef = db.collection("players").doc(currentUser.uid);
     const playerDoc = await playerRef.get();
     const playerData = playerDoc.data();
     
-    // Enhanced prompt that asks for specific, actionable quests
+    // Create a simpler, more direct prompt for better JSON response
     const prompt = `
-Create a specific, actionable quest for someone with this goal: "${goalsText}"
+Generate a personalized ${questType} quest for a productivity app based on these goals: "${goalsText}"
 
-The quest should be CONCRETE and DETAILED, breaking down a specific action they can take to achieve their goal.
-For example:
-- If they want to be a web developer: Create a quest about writing HTML/CSS for 30 minutes or building a specific component
-- If they want to get fit: Create a quest for specific exercises like "Complete 3 sets of pushups and squats"
-- If they want to learn a language: Create a quest like "Practice Spanish verbs for 20 minutes"
+Create a quest with these exact properties:
+1. title - Brief, engaging title
+2. description - Clear description of what to do
+3. targetCount - Numerical goal (between 1-100)
+4. metric - Unit of measurement (e.g., minutes, pages, reps)
+5. type - "${questType}"
 
-IMPORTANT: Respond ONLY with a JSON object using this exact format:
-
+Return ONLY a valid JSON object with these 5 fields, without any explanation or additional text:
 {
-  "title": "Brief, specific title (3-5 words)",
-  "description": "Detailed instructions with specific actions to take",
-  "targetCount": 5,
-  "metric": "specific unit of measurement",
+  "title": "Quest Title",
+  "description": "Quest description",
+  "targetCount": 10,
+  "metric": "unit",
   "type": "${questType}"
 }
-
-Make sure:
-1. Title is brief but specific to the action
-2. Description has DETAILED instructions on exactly what to do
-3. TargetCount is a number from 1-30
-4. Metric is specific (reps, minutes, pages, sessions, etc.)
 `;
 
+    // Call AI API
     const aiResponse = await soloAISystem.callDeepSeekAPI(prompt);
     console.log("AI Response:", aiResponse);
     
+    // Try multiple parsing strategies
     let quest = null;
+    
+    // Strategy 1: Try to extract and parse JSON
     try {
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const jsonStr = jsonMatch[0].trim();
-        quest = JSON.parse(jsonStr);
-        console.log("JSON parsing successful:", quest);
+        try {
+          quest = JSON.parse(jsonStr);
+          console.log("JSON parsing successful:", quest);
+        } catch (jsonError) {
+          console.error("JSON parse error:", jsonError);
+        }
       }
     } catch (error) {
-      console.error("JSON parse error:", error);
+      console.log("Strategy 1 failed:", error);
     }
     
-    // If parsing failed, create a specific default quest based on the goal
+    // Strategy 2: Parse key-value pairs directly
     if (!quest) {
-      let defaultTitle = "";
-      let defaultDescription = "";
-      let defaultMetric = "sessions";
-      let defaultCount = 5;
-      
-      // Generate more specific defaults based on keywords in the goal
-      const goal = goalsText.toLowerCase();
-      
-      if (goal.includes("stronger") || goal.includes("fit") || goal.includes("muscle") || 
-          goal.includes("lean") || goal.includes("weight") || goal.includes("exercise")) {
-        defaultTitle = "Strength Training Circuit";
-        defaultDescription = "Complete a full-body workout: 3 sets of 10 pushups, 15 squats, 10 lunges per leg, and 30-second plank. Rest 60 seconds between exercises.";
-        defaultMetric = "workouts";
-        defaultCount = 3;
-      } else if (goal.includes("code") || goal.includes("programming") || goal.includes("developer") || goal.includes("web")) {
-        defaultTitle = "Coding Practice Session";
-        defaultDescription = "Spend time writing code for your project. Focus on implementing one specific feature or fixing one bug completely.";
-        defaultMetric = "sessions";
-        defaultCount = 4;
-      } else if (goal.includes("read") || goal.includes("book") || goal.includes("study")) {
-        defaultTitle = "Focused Study Session";
-        defaultDescription = "Complete a focused study session with no distractions. Take notes on key concepts and review them afterward.";
-        defaultMetric = "pages";
-        defaultCount = 15;
-      } else if (goal.includes("language") || goal.includes("speak") || goal.includes("vocabulary")) {
-        defaultTitle = "Language Practice";
-        defaultDescription = "Practice your target language by learning 10 new vocabulary words and using each in a complete sentence.";
-        defaultMetric = "minutes";
-        defaultCount = 20;
-      } else {
-        defaultTitle = "Goal Progress Session";
-        defaultDescription = "Work on your goal of " + goalsText + ". Break it down into small steps and complete one step fully.";
-        defaultMetric = "sessions";
-        defaultCount = 3;
+      try {
+        const title = aiResponse.match(/["']?title["']?\s*[:=]\s*["']([^"']+)["']/i)?.[1]?.trim();
+        const description = aiResponse.match(/["']?description["']?\s*[:=]\s*["']([^"']+)["']/i)?.[1]?.trim();
+        const targetCount = parseInt(aiResponse.match(/["']?targetCount["']?\s*[:=]\s*(\d+)/i)?.[1] || '0');
+        const metric = aiResponse.match(/["']?metric["']?\s*[:=]\s*["']([^"']+)["']/i)?.[1]?.trim();
+        
+        if (title && targetCount > 0 && metric) {
+          quest = {
+            title,
+            description: description || `Complete ${targetCount} ${metric}`,
+            targetCount,
+            metric,
+            type: questType
+          };
+          console.log("Key-value parsing successful:", quest);
+        }
+      } catch (error) {
+        console.log("Strategy 2 failed:", error);
       }
-      
+    }
+    
+    // Strategy 3: Create a default quest from the response
+    if (!quest) {
+      try {
+        const lines = aiResponse.split('\n').filter(line => line.trim());
+        
+        // Check if first line might be a title
+        let possibleTitle = lines[0]?.replace(/^[^a-zA-Z0-9"']+/, '').trim() || "New Quest";
+        if (possibleTitle.startsWith('"') && possibleTitle.endsWith('"')) {
+          possibleTitle = possibleTitle.slice(1, -1);
+        }
+        
+        // Look for any numbers to use as targetCount
+        const numberMatch = aiResponse.match(/(\d+)\s*([a-zA-Z]+)/);
+        const targetCount = numberMatch ? parseInt(numberMatch[1]) : 5;
+        const possibleMetric = numberMatch ? numberMatch[2].trim() : "times";
+        
+        quest = {
+          title: possibleTitle,
+          description: goalsText.length > 80 ? goalsText.substring(0, 80) + "..." : goalsText,
+          targetCount: targetCount,
+          metric: possibleMetric,
+          type: questType
+        };
+        console.log("Fallback quest created:", quest);
+      } catch (error) {
+        console.log("Strategy 3 failed:", error);
+      }
+    }
+    
+    // Final fallback - just create a basic quest
+    if (!quest) {
       quest = {
-        title: defaultTitle,
-        description: defaultDescription,
-        targetCount: defaultCount,
-        metric: defaultMetric,
+        title: "Your Personal Quest",
+        description: goalsText.length > 80 ? goalsText.substring(0, 80) + "..." : goalsText,
+        targetCount: 5,
+        metric: "times",
         type: questType
       };
-      console.log("Using specialized default quest:", quest);
+      console.log("Using hardcoded fallback quest");
     }
-    
-    // Validate the quest data
-    quest.title = quest.title || "Goal Progress";
-    quest.description = quest.description || `Work on specific actions to achieve: ${goalsText}`;
-    quest.targetCount = parseInt(quest.targetCount) || 5;
-    quest.metric = quest.metric || "times";
-    quest.type = questType;
     
     // Display the suggestion
     resultsContainer.innerHTML = `
@@ -12688,8 +11613,10 @@ Make sure:
       </div>
     `;
     
+    // Store the suggestion in a global variable for access in event handlers
     window.currentSuggestion = quest;
     
+    // Add event listeners for buttons
     document.getElementById('acceptSuggestion').addEventListener('click', () => {
       acceptQuestSuggestion(quest);
     });
@@ -12709,12 +11636,14 @@ Make sure:
       </div>
     `;
     
+    // Add retry button functionality
     const retryBtn = document.getElementById('retryGenerateBtn');
     if (retryBtn) {
       retryBtn.addEventListener('click', generateQuestSuggestion);
     }
   }
 }
+
 async function acceptQuestSuggestion(quest) {
   try {
     // Create the quest
@@ -12767,21 +11696,6 @@ function addQuestSuggestionStyles() {
       transition: all 0.3s ease;
       border: 1px solid rgba(0, 160, 255, 0.5) !important;
       letter-spacing: 1px;
-      padding: 6px 12px;
-    background: rgba(0, 80, 160, 0.4);
-    color: #00c8ff;
-    border-radius: 3px;
-    font-family: 'Rajdhani', sans-serif;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    letter-spacing: 0.5px;
-    font-size: 12px;
-    border: 1px solid rgba(0, 160, 255, 0.3);
     }
     
     .floating-suggest-button:hover {
@@ -12800,7 +11714,7 @@ function addQuestSuggestionStyles() {
       border: 1px solid rgba(0, 160, 255, 0.6) !important;
       box-shadow: 0 0 15px rgba(0, 190, 255, 0.4), inset 0 0 20px rgba(0, 130, 255, 0.1) !important;
       width: 500px;
-      height: fit-content;
+      height: 450px;
     }
     
     #suggestQuestWindow::before {
@@ -13055,905 +11969,4 @@ function addQuestSuggestionStyles() {
 
 
 // Initialize the quest suggestion system
-initializeQuestSuggestionSystem();
-
-
-
-// Fixed Solo Leveling style level-down animation
-function showLevelDownAnimation(previousLevel, newLevel) {
-  // Remove any existing animation containers
-  const existingContainer = document.querySelector('.sl-level-animation-container');
-  if (existingContainer) {
-    document.body.removeChild(existingContainer);
-  }
-  
-  // Create container for the animation
-  const container = document.createElement('div');
-  container.className = 'sl-level-animation-container sl-level-down';
-  document.body.appendChild(container);
-  
-  // Create inner container with glow
-  const innerContainer = document.createElement('div');
-  innerContainer.className = 'sl-level-animation-inner';
-  container.appendChild(innerContainer);
-  
-  // Create level display
-  const levelDisplay = document.createElement('div');
-  levelDisplay.className = 'sl-level-display';
-  innerContainer.appendChild(levelDisplay);
-  
-  // Create text elements
-  const levelText = document.createElement('div');
-  levelText.className = 'sl-level-text';
-  levelText.textContent = 'LEVEL';
-  levelDisplay.appendChild(levelText);
-  
-  const levelNumberContainer = document.createElement('div');
-  levelNumberContainer.className = 'sl-level-number-container';
-  levelDisplay.appendChild(levelNumberContainer);
-  
-  const oldNumber = document.createElement('div');
-  oldNumber.className = 'sl-level-number sl-old-level';
-  oldNumber.textContent = previousLevel;
-  levelNumberContainer.appendChild(oldNumber);
-  
-  const newNumber = document.createElement('div');
-  newNumber.className = 'sl-level-number sl-new-level';
-  newNumber.textContent = newLevel;
-  levelNumberContainer.appendChild(newNumber);
-  
-  const statusText = document.createElement('div');
-  statusText.className = 'sl-status-text';
-  statusText.textContent = 'LEVEL DOWN';
-  levelDisplay.appendChild(statusText);
-  
-  // Try to play penalty sound
-  try {
-    audioSystem.playVoiceLine('PENALTY');
-  } catch (e) {
-    console.log('Voice line not available:', e);
-  }
-  
-  // Animation sequence
-  setTimeout(() => {
-    container.classList.add('sl-active');
-    statusText.classList.add('sl-status-active');
-  }, 100);
-  
-  setTimeout(() => {
-    oldNumber.classList.add('sl-number-exit');
-    newNumber.classList.add('sl-number-enter');
-    innerContainer.classList.add('sl-flash-red');
-  }, 1500);
-  
-  // Remove the animation container after complete
-  setTimeout(() => {
-    container.classList.add('sl-fade-out');
-    setTimeout(() => {
-      if (document.body.contains(container)) {
-        document.body.removeChild(container);
-      }
-    }, 800);
-  }, 4000);
-}
-
-// New Solo Leveling style level-up animation
-function showLevelUpAnimation(previousLevel, newLevel) {
-  // Remove any existing animation containers
-  const existingContainer = document.querySelector('.sl-level-animation-container');
-  if (existingContainer) {
-    document.body.removeChild(existingContainer);
-  }
-  
-  // Create container for the animation
-  const container = document.createElement('div');
-  container.className = 'sl-level-animation-container sl-level-up';
-  document.body.appendChild(container);
-  
-  // Create particles for celebratory effect
-  for (let i = 0; i < 30; i++) {
-    const particle = document.createElement('div');
-    particle.className = 'sl-particle';
-    
-    // Randomize particle properties
-    const size = 3 + Math.random() * 7;
-    const posX = 30 + Math.random() * 40; // percentage from center
-    const delay = Math.random() * 1.5;
-    const duration = 1 + Math.random() * 2;
-    
-    particle.style.width = `${size}px`;
-    particle.style.height = `${size}px`;
-    particle.style.left = `${posX}%`;
-    particle.style.animationDelay = `${delay}s`;
-    particle.style.animationDuration = `${duration}s`;
-    
-    container.appendChild(particle);
-  }
-  
-  // Create inner container with glow
-  const innerContainer = document.createElement('div');
-  innerContainer.className = 'sl-level-animation-inner';
-  container.appendChild(innerContainer);
-  
-  // Create level display
-  const levelDisplay = document.createElement('div');
-  levelDisplay.className = 'sl-level-display';
-  innerContainer.appendChild(levelDisplay);
-  
-  // Create text elements
-  const levelText = document.createElement('div');
-  levelText.className = 'sl-level-text';
-  levelText.textContent = 'LEVEL';
-  levelDisplay.appendChild(levelText);
-  
-  const levelNumberContainer = document.createElement('div');
-  levelNumberContainer.className = 'sl-level-number-container';
-  levelDisplay.appendChild(levelNumberContainer);
-  
-  const oldNumber = document.createElement('div');
-  oldNumber.className = 'sl-level-number sl-old-level';
-  oldNumber.textContent = previousLevel;
-  levelNumberContainer.appendChild(oldNumber);
-  
-  const newNumber = document.createElement('div');
-  newNumber.className = 'sl-level-number sl-new-level';
-  newNumber.textContent = newLevel;
-  levelNumberContainer.appendChild(newNumber);
-  
-  const statusText = document.createElement('div');
-  statusText.className = 'sl-status-text';
-  statusText.textContent = 'LEVEL UP';
-  levelDisplay.appendChild(statusText);
-  
-  // Try to play level up sound
-  try {
-    audioSystem.playVoiceLine('LEVEL_UP');
-  } catch (e) {
-    console.log('Voice line not available:', e);
-  }
-  
-  // Animation sequence
-  setTimeout(() => {
-    container.classList.add('sl-active');
-    statusText.classList.add('sl-status-active');
-  }, 100);
-  
-  setTimeout(() => {
-    oldNumber.classList.add('sl-number-exit');
-    newNumber.classList.add('sl-number-enter');
-    innerContainer.classList.add('sl-flash-blue');
-  }, 1500);
-  
-  // Remove the animation container after complete
-  setTimeout(() => {
-    container.classList.add('sl-fade-out');
-    setTimeout(() => {
-      if (document.body.contains(container)) {
-        document.body.removeChild(container);
-      }
-    }, 800);
-  }, 4500);
-}
-
-// Call this function to handle level changes
-function handleLevelChange(previousLevel, newLevel) {
-  if (newLevel > previousLevel) {
-    showLevelUpAnimation(previousLevel, newLevel);
-  } else if (newLevel < previousLevel) {
-    showLevelDownAnimation(previousLevel, newLevel);
-  }
-}
-
-// Update both animations' styles
-function addLevelAnimationStyles() {
-  const styleEl = document.createElement('style');
-  styleEl.textContent = `
-    .sl-level-animation-container {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-      background-color: rgba(0, 0, 0, 0.85);
-      opacity: 0;
-      transition: opacity 0.5s ease;
-    }
-    
-    .sl-active {
-      opacity: 1;
-    }
-    
-    /* Level Down Styles */
-    .sl-level-down .sl-level-animation-inner {
-      width: 400px;
-      height: 300px;
-      border: none;
-      background-color: rgba(0, 0, 0, 0.9);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      box-shadow: 0 0 20px rgba(255, 0, 0, 0.5), inset 0 0 20px rgba(255, 0, 0, 0.3);
-      position: relative;
-      transition: all 0.3s ease;
-      animation: sl-float 1.5s ease-in-out infinite alternate;
-    }
-    
-    .sl-level-down .sl-old-level {
-      color: #f8d210;
-      text-shadow: 0 0 15px rgba(248, 210, 16, 0.7);
-    }
-    
-    .sl-level-down .sl-new-level {
-      color: #ff4747;
-      text-shadow: 0 0 15px rgba(255, 71, 71, 0.7);
-    }
-    
-    .sl-level-down .sl-status-text {
-      color: #ff4747;
-    }
-    
-    .sl-flash-red {
-      animation: sl-red-flash 0.5s ease;
-    }
-    
-    /* Level Up Styles */
-    .sl-level-up .sl-level-animation-inner {
-      width: 400px;
-      height: 300px;
-      border: none;
-      background-color: rgba(0, 0, 0, 0.9);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      box-shadow: 0 0 20px rgba(0, 200, 255, 0.5), inset 0 0 20px rgba(0, 200, 255, 0.3);
-      position: relative;
-      transition: all 0.3s ease;
-      animation: sl-float 1.5s ease-in-out infinite alternate;
-    }
-    
-    .sl-level-up .sl-old-level {
-      color: #3366ff;
-      text-shadow: 0 0 15px rgba(51, 102, 255, 0.7);
-    }
-    
-    .sl-level-up .sl-new-level {
-      color: #00ff99;
-      text-shadow: 0 0 15px rgba(0, 255, 153, 0.7);
-    }
-    
-    .sl-level-up .sl-status-text {
-      color: #00ff99;
-    }
-    
-    .sl-flash-blue {
-      animation: sl-blue-flash 0.5s ease;
-    }
-    
-    /* Particle effect for level up */
-    .sl-particle {
-      position: absolute;
-      background-color: #00ffcc;
-      border-radius: 50%;
-      top: 50%;
-      opacity: 0;
-      animation: sl-particle-float 3s ease-out forwards;
-    }
-    
-    /* Shared Styles */
-    .sl-level-display {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      height: 100%;
-      padding: 20px;
-    }
-    
-    .sl-level-text {
-      font-size: 28px;
-      color: rgba(255, 255, 255, 0.7);
-      margin-bottom: 20px;
-      letter-spacing: 5px;
-      font-weight: bold;
-    }
-    
-    .sl-level-number-container {
-      position: relative;
-      height: 120px;
-      width: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      margin-bottom: 20px;
-      overflow: hidden;
-    }
-    
-    .sl-level-number {
-      font-size: 120px;
-      font-weight: bold;
-      position: absolute;
-      transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-    
-    .sl-new-level {
-      transform: translateY(100px);
-      opacity: 0;
-    }
-    
-    .sl-number-exit {
-      transform: translateY(-100px);
-      opacity: 0;
-    }
-    
-    .sl-number-enter {
-      transform: translateY(0);
-      opacity: 1;
-    }
-    
-    .sl-status-text {
-      font-size: 24px;
-      letter-spacing: 3px;
-      font-weight: bold;
-      opacity: 0;
-      transform: translateY(10px);
-      transition: all 0.5s ease;
-    }
-    
-    .sl-status-active {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    
-    .sl-fade-out {
-      opacity: 0;
-      transition: opacity 0.8s ease;
-    }
-    
-    @keyframes sl-float {
-      0% { transform: translateY(0); }
-      100% { transform: translateY(-10px); }
-    }
-    
-    @keyframes sl-red-flash {
-      0% { box-shadow: 0 0 20px rgba(255, 0, 0, 0.5), inset 0 0 20px rgba(255, 0, 0, 0.3); }
-      50% { box-shadow: 0 0 40px rgba(255, 0, 0, 0.8), inset 0 0 40px rgba(255, 0, 0, 0.6); }
-      100% { box-shadow: 0 0 20px rgba(255, 0, 0, 0.5), inset 0 0 20px rgba(255, 0, 0, 0.3); }
-    }
-    
-    @keyframes sl-blue-flash {
-      0% { box-shadow: 0 0 20px rgba(0, 200, 255, 0.5), inset 0 0 20px rgba(0, 200, 255, 0.3); }
-      50% { box-shadow: 0 0 40px rgba(0, 200, 255, 0.8), inset 0 0 40px rgba(0, 200, 255, 0.6); }
-      100% { box-shadow: 0 0 20px rgba(0, 200, 255, 0.5), inset 0 0 20px rgba(0, 200, 255, 0.3); }
-    }
-    
-    @keyframes sl-particle-float {
-      0% { 
-        transform: translate(-50%, -50%);
-        opacity: 0;
-      }
-      10% {
-        opacity: 1;
-      }
-      100% { 
-        transform: translate(-50%, -300%);
-        opacity: 0;
-      }
-    }
-  `;
-  document.head.appendChild(styleEl);
-}
-
-// Replace addLevelDownAnimationStyles with this more comprehensive function
-function addLevelDownAnimationStyles() {
-  addLevelAnimationStyles();
-}
-
-
-
-// Fix updateUsernameDisplays to work with terminal-prompt-user and preserve titles
-function updateUsernameDisplays() {
-  if (!currentUser || !playerStats) return;
-  
-  const streakCount = playerStats.streak || 0;
-  const username = playerStats.profile?.name || 'Hunter';
-  const title = playerStats.profile?.title || null;
-  
-  // Only proceed if streak is 3 or higher
-  if (streakCount >= 3) {
-    const streakHTML = getStreakUserNameHTML(username, streakCount, title);
-    
-    // Update terminal prompt (correct selector)
-    const terminalPrompt = document.querySelector('.terminal-prompt-user');
-    if (terminalPrompt) {
-      terminalPrompt.innerHTML = streakHTML;
-      
-      // Apply title color if it exists
-      if (playerStats.profile?.titleColor) {
-        terminalPrompt.style.color = playerStats.profile.titleColor;
-      }
-    }
-    
-    // Status bar username
-    const statusBarUsername = document.getElementById('status-username');
-    if (statusBarUsername) {
-      statusBarUsername.innerHTML = streakHTML;
-    }
-    
-    // Profile name
-    const profileName = document.getElementById('profile-name');
-    if (profileName) {
-      profileName.innerHTML = streakHTML;
-    }
-  } else {
-    // If streak < 3, restore normal username display
-    updateTerminalPrompt(); // Use original function for terminal
-  }
-}
-function getStreakUserNameHTML(username, streakCount, title = null) {
-  let displayName = username;
-  
-  // Add title if provided
-  if (title) {
-    displayName = `[${title}] ${displayName}`;
-  }
-  
-  // Only add fire icon if streak count is 3 or higher
-  if (!streakCount || streakCount < 3) {
-    return displayName;
-  }
-  
-  return `
-    <span class="streak-username-container">
-      <span class="streak-username">${displayName}</span>
-      <i class="fa-solid fa-fire streak-flame-icon"></i>
-      <span class="streak-counter">${streakCount}</span>
-    </span>
-  `;
-}
-
-// Simplified styling for Font Awesome icon
-function addStreakUsernameStyles() {
-  const styleEl = document.createElement('style');
-  styleEl.textContent = `
-    .streak-username-container {
-      position: relative;
-      display: inline-block;
-      padding-right: 20px;
-    }
-    
-    .streak-username {
-      position: relative;
-      z-index: 2;
-    }
-    
-    .streak-flame-icon {
-      color: #ff6a00;
-      position: absolute;
-      top: -5px;
-      right: 3px;
-      font-size: 18px;
-      z-index: 1;
-      filter: drop-shadow(0 0 2px rgba(255, 0, 0, 0.4));
-    }
-    
-    .streak-counter {
-      position: absolute;
-      top: -2px;
-      right: 4px;
-      font-size: 9px;
-      padding: 0;
-      color: white;
-      background-color: #ff6a00;
-      border-radius: 50%;
-      width: 14px;
-      height: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 3;
-      font-weight: bold;
-    }
-  `;
-  document.head.appendChild(styleEl);
-}
-
-// This would be in your initialize or window system setup code
-function setupProfileWindow() {
-  const profileWindow = document.getElementById("profile-window");
-  if (!profileWindow) return;
-  
-  // Find the edit-profile section or create it
-  let editSection = profileWindow.querySelector(".edit-profile-section");
-  if (!editSection) {
-    editSection = document.createElement("div");
-    editSection.className = "edit-profile-section";
-    profileWindow.appendChild(editSection);
-  }
-  
-  // Add title selection dropdown
-  const titleSelectHTML = `
-    <div class="profile-edit-item">
-      <label for="profileTitleSelect">Title:</label>
-      <select id="profileTitleSelect" class="profile-select">
-        <option value="Novice">Novice</option>
-      </select>
-    </div>
-  `;
-  
-  // Add other edit fields as needed
-  editSection.innerHTML = titleSelectHTML + `
-    <div class="profile-edit-item">
-      <button id="editProfileBtn" class="sl-button">Edit Profile</button>
-    </div>
-  `;
-  
-  // Add event listener for edit button
-  const editBtn = document.getElementById("editProfileBtn");
-  if (editBtn) {
-    editBtn.addEventListener("click", () => {
-      showSetNamePrompt();
-    });
-  }
-}
-
-// Call this in your initialization
-setupProfileWindow();
-
-function showRankUpAnimation(previousRank, newRank) {
-  // Add 5 second delay before starting animation
-  setTimeout(() => {
-    // Remove any existing animation containers
-    const existingContainer = document.querySelector('.sl-rank-animation-container');
-    if (existingContainer) {
-      document.body.removeChild(existingContainer);
-    }
-    
-    // Get rank style data
-    const rankStyles = {
-      E: {
-        shape: "polygon(50% 0%, 100% 86%, 0% 86%)", // Simple triangle
-        color: "#88b0d0",
-        glow: "rgba(136, 176, 208, 0.5)"
-      },
-      D: {
-        shape: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)", // Diamond/square
-        color: "#66b8e0",
-        glow: "rgba(102, 184, 224, 0.6)"
-      },
-      C: {
-        shape: "polygon(50% 0%, 95% 35%, 80% 90%, 20% 90%, 5% 35%)", // Pentagon
-        color: "#44c0f0",
-        glow: "rgba(68, 192, 240, 0.7)"
-      },
-      B: {
-        shape: "polygon(50% 0%, 85% 25%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 15% 25%)", // Hexagon
-        color: "#22c8ff",
-        glow: "rgba(34, 200, 255, 0.8)"
-      },
-      A: {
-        shape: "polygon(50% 0%, 75% 15%, 100% 40%, 95% 75%, 70% 100%, 30% 100%, 5% 75%, 0% 40%, 25% 15%)", // Octagon
-        color: "linear-gradient(135deg, #00c8ff, #0080ff)",
-        glow: "rgba(0, 200, 255, 0.9)"
-      },
-      S: {
-        shape: "polygon(50% 0%, 72% 10%, 90% 30%, 100% 55%, 90% 80%, 65% 100%, 35% 100%, 10% 80%, 0% 55%, 10% 30%, 28% 10%)", // Complex star shape
-        color: "linear-gradient(135deg, #7700ff, #00d8ff)",
-        glow: "rgba(128, 0, 255, 1.0)"
-      }
-    };
-
-    // Create container for the animation
-    const container = document.createElement('div');
-    container.className = 'sl-rank-animation-container';
-    document.body.appendChild(container);
-
-    // Create particles with rank-specific colors
-    const particleCount = newRank === 'S' ? 60 : newRank === 'A' ? 40 : 30;
-    const particleColors = newRank === 'S' 
-      ? ['#7700ff', '#00d8ff', '#ff00d0'] 
-      : newRank === 'A' 
-        ? ['#00c8ff', '#0080ff', '#00ffff'] 
-        : [rankStyles[newRank].color];
-
-    for (let i = 0; i < particleCount; i++) {
-      const particle = document.createElement('div');
-      particle.className = 'sl-rank-particle';
-      
-      // Randomize particle properties
-      const size = 3 + Math.random() * 8;
-      const posX = Math.random() * 100; // percentage
-      const posY = Math.random() * 100; // percentage
-      const delay = Math.random() * 2;
-      const duration = 1 + Math.random() * 3;
-      const colorIndex = Math.floor(Math.random() * particleColors.length);
-      
-      particle.style.width = `${size}px`;
-      particle.style.height = `${size}px`;
-      particle.style.left = `${posX}%`;
-      particle.style.top = `${posY}%`;
-      particle.style.backgroundColor = particleColors[colorIndex];
-      particle.style.animationDelay = `${delay}s`;
-      particle.style.animationDuration = `${duration}s`;
-      
-      container.appendChild(particle);
-    }
-    
-    // Create inner container with glow
-    const innerContainer = document.createElement('div');
-    innerContainer.className = 'sl-rank-animation-inner';
-    container.appendChild(innerContainer);
-    
-    // Create rank display section
-    const rankDisplay = document.createElement('div');
-    rankDisplay.className = 'sl-rank-display';
-    innerContainer.appendChild(rankDisplay);
-    
-    // Create text elements
-    const rankText = document.createElement('div');
-    rankText.className = 'sl-rank-text';
-    rankText.textContent = 'HUNTER RANK';
-    rankDisplay.appendChild(rankText);
-    
-    // Create rank badge container
-    const rankBadgeContainer = document.createElement('div');
-    rankBadgeContainer.className = 'sl-rank-badge-container';
-    rankDisplay.appendChild(rankBadgeContainer);
-    
-    // Create the old rank badge
-    const oldBadge = document.createElement('div');
-    oldBadge.className = 'sl-rank-badge sl-old-rank';
-    oldBadge.textContent = previousRank;
-    oldBadge.style.clipPath = rankStyles[previousRank].shape;
-    oldBadge.style.background = rankStyles[previousRank].color;
-    oldBadge.style.boxShadow = `0 0 15px ${rankStyles[previousRank].glow}`;
-    rankBadgeContainer.appendChild(oldBadge);
-    
-    // Create the new rank badge
-    const newBadge = document.createElement('div');
-    newBadge.className = 'sl-rank-badge sl-new-rank';
-    newBadge.textContent = newRank;
-    newBadge.style.clipPath = rankStyles[newRank].shape;
-    newBadge.style.background = rankStyles[newRank].color;
-    newBadge.style.boxShadow = `0 0 20px ${rankStyles[newRank].glow}`;
-    rankBadgeContainer.appendChild(newBadge);
-    
-    // Add status text
-    const statusText = document.createElement('div');
-    statusText.className = 'sl-rank-status-text';
-    statusText.textContent = 'RANK UP';
-    rankDisplay.appendChild(statusText);
-    
-    // Try to play rank up sound
-    try {
-      audioSystem.playVoiceLine('RANK_UP');
-    } catch (e) {
-      console.log('Voice line not available, using default sound');
-      notificationSystem.playSound("achievement");
-    }
-    
-    // Animation sequence
-    setTimeout(() => {
-      container.classList.add('sl-active');
-      statusText.classList.add('sl-status-active');
-    }, 100);
-    
-    setTimeout(() => {
-      oldBadge.classList.add('sl-badge-exit');
-      newBadge.classList.add('sl-badge-enter');
-      innerContainer.classList.add('sl-flash');
-    }, 1500);
-    
-    // Special effects for higher ranks
-    if (newRank === 'S' || newRank === 'A') {
-      setTimeout(() => {
-        innerContainer.classList.add('sl-special-effect');
-        if (newRank === 'S') {
-          const shockwave = document.createElement('div');
-          shockwave.className = 'sl-shockwave';
-          container.appendChild(shockwave);
-        }
-      }, 2000);
-    }
-    
-    // Remove the animation container after complete
-    setTimeout(() => {
-      container.classList.add('sl-fade-out');
-      setTimeout(() => {
-        if (document.body.contains(container)) {
-          document.body.removeChild(container);
-        }
-      }, 1000);
-    }, 5500);
-  }, 5000); // 5 second delay
-}
-
-// Add CSS styles for the rank up animation
-function addRankAnimationStyles() {
-  if (document.getElementById('rankAnimationStyles')) return;
-  
-  const styleSheet = document.createElement('style');
-  styleSheet.id = 'rankAnimationStyles';
-  styleSheet.textContent = `
-    .sl-rank-animation-container {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: rgba(0, 0, 0, 0.85);
-      z-index: 10000;
-      opacity: 0;
-      transition: opacity 0.5s ease;
-      pointer-events: none;
-    }
-    
-    .sl-rank-animation-container.sl-active {
-      opacity: 1;
-    }
-    
-    .sl-rank-animation-container.sl-fade-out {
-      opacity: 0;
-    }
-    
-    .sl-rank-animation-inner {
-      background: rgba(0, 24, 48, 0.9);
-      border: 2px solid #0088ff;
-      border-radius: 10px;
-      padding: 40px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 0 30px rgba(0, 136, 255, 0.5);
-      transform: scale(0.9);
-      transition: transform 0.5s ease, box-shadow 0.5s ease;
-    }
-    
-    .sl-rank-animation-inner.sl-flash {
-      animation: rankFlash 1s forwards;
-    }
-    
-    .sl-rank-animation-inner.sl-special-effect {
-      animation: rankPulse 2s infinite;
-    }
-    
-    .sl-rank-display {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 20px;
-    }
-    
-    .sl-rank-text {
-      font-size: 28px;
-      font-weight: bold;
-      color: #00ffff;
-      text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
-      letter-spacing: 2px;
-    }
-    
-    .sl-rank-badge-container {
-      position: relative;
-      width: 150px;
-      height: 150px;
-      margin: 20px 0;
-    }
-    
-    .sl-rank-badge {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-size: 72px;
-      font-weight: bold;
-      color: white;
-      text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-      transition: transform 1s ease, opacity 1s ease;
-    }
-    
-    .sl-old-rank {
-      opacity: 1;
-      transform: scale(1);
-    }
-    
-    .sl-new-rank {
-      opacity: 0;
-      transform: scale(0.5);
-    }
-    
-    .sl-badge-exit {
-      opacity: 0;
-      transform: scale(0.5) rotate(-30deg);
-    }
-    
-    .sl-badge-enter {
-      opacity: 1;
-      transform: scale(1.2);
-      animation: badgeEntrance 1.5s forwards;
-    }
-    
-    .sl-rank-status-text {
-      font-size: 36px;
-      font-weight: bold;
-      color: white;
-      margin-top: 20px;
-      text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
-      opacity: 0;
-      transform: translateY(20px);
-      transition: all 0.5s ease;
-    }
-    
-    .sl-rank-status-text.sl-status-active {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    
-    .sl-rank-particle {
-      position: absolute;
-      border-radius: 50%;
-      opacity: 0;
-      animation: particleRise 3s ease-out forwards;
-    }
-    
-    .sl-shockwave {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.8);
-      opacity: 0.8;
-      animation: shockwave 1.5s ease-out forwards;
-    }
-    
-    @keyframes rankFlash {
-      0% { box-shadow: 0 0 30px rgba(0, 136, 255, 0.5); }
-      50% { box-shadow: 0 0 50px rgba(255, 255, 255, 0.9); }
-      100% { box-shadow: 0 0 40px rgba(0, 136, 255, 0.7); }
-    }
-    
-    @keyframes rankPulse {
-      0% { transform: scale(0.95); box-shadow: 0 0 30px rgba(0, 136, 255, 0.5); }
-      50% { transform: scale(1); box-shadow: 0 0 50px rgba(0, 136, 255, 0.8); }
-      100% { transform: scale(0.95); box-shadow: 0 0 30px rgba(0, 136, 255, 0.5); }
-    }
-    
-    @keyframes badgeEntrance {
-      0% { transform: scale(1.2); }
-      10% { transform: scale(1.3); }
-      20% { transform: scale(1.1); }
-      30% { transform: scale(1.2); }
-      100% { transform: scale(1); }
-    }
-    
-    @keyframes particleRise {
-      0% { transform: translateY(0) scale(1); opacity: 0; }
-      10% { opacity: 1; }
-      100% { transform: translateY(-100px) scale(0); opacity: 0; }
-    }
-    
-    @keyframes shockwave {
-      0% { width: 20px; height: 20px; opacity: 0.8; }
-      100% { width: 500px; height: 500px; opacity: 0; }
-    }
-  `;
-  
-  document.head.appendChild(styleSheet);
-}
-
-// Call this at app initialization
-addRankAnimationStyles();
+initializeQuestSuggestionSystem();s

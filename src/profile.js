@@ -5,7 +5,8 @@ export async function showProfile(isAuthenticated) {
   }
 
   const playerRef = db.collection("players").doc(currentUser.uid);
-  const player = (await playerRef.get()).data();
+  const playerDoc = await playerRef.get();
+  const player = playerDoc.data();
 
   // Ensure profile exists
   if (!player.profile) {
@@ -15,51 +16,88 @@ export async function showProfile(isAuthenticated) {
       picture: "default.png",
       bio: "",
       class: "Hunter",
-      joinDate: null,
+      joinDate: player.profile?.joinDate || firebase.firestore.FieldValue.serverTimestamp(),
+      unlockedTitles: [],
     };
-    // Update the player document with initialized profile
     await playerRef.update({ profile: player.profile });
   }
 
-  printToTerminal("\n=== PLAYER PROFILE ===", "system");
-  printToTerminal(`Name: ${player.profile.name || "Not set"}`, "info");
-  printToTerminal(`Title: ${player.profile.title || "Novice"}`, "info");
-  printToTerminal(`Class: ${player.profile.class || "Hunter"}`, "info");
-  if (player.profile.bio) {
-    printToTerminal(`\nBio: ${player.profile.bio}`, "info");
-  }
-  printToTerminal("\nStats:", "info");
-  printToTerminal(`Level: ${player.level}`, "info");
-  printToTerminal(`EXP: ${player.exp}/100`, "info");
-  printToTerminal(`Gold: ${player.gold}`, "info");
-  printToTerminal(`Rank: ${player.rank}`, "info");
-  printToTerminal(`Daily Streak: ${player.streak} days`, "info");
-  printToTerminal(`Quests Completed: ${player.questsCompleted}`, "info");
+  // Update streak before displaying
+  await checkDailyStreak();
+  
+  // Update local playerStats
+  playerStats.profile = player.profile;
+  playerStats.level = player.level;
+  playerStats.exp = player.exp;
+  playerStats.gold = player.gold;
+  playerStats.rank = player.rank;
+  playerStats.streak = player.streak;
+  playerStats.questsCompleted = player.questsCompleted;
+  playerStats.waterIntake = player.waterIntake;
+  playerStats.achievements = player.achievements;
 
-  if (player.waterIntake?.streakDays > 0) {
-    printToTerminal(
-      `Water Streak: ${player.waterIntake.streakDays} days`,
-      "info"
-    );
-  }
-
-  printToTerminal("\nAchievements:", "info");
-  if (!player.achievements || player.achievements.length === 0) {
-    printToTerminal("No achievements yet", "warning");
+  // Prepare achievements display
+  let achievementsHTML = '';
+  if (!player.achievements || Object.keys(player.achievements).length === 0) {
+    achievementsHTML = '<div class="profile-achievements-none">No achievements yet</div>';
   } else {
-    player.achievements.forEach((achievementId) => {
-      const achievement = Object.values(ACHIEVEMENTS).find(
-        (a) => a.id === achievementId
-      );
+    achievementsHTML = '<div class="profile-achievements-list">';
+    for (const [achId, achData] of Object.entries(player.achievements)) {
+      const achievement = Object.values(ACHIEVEMENTS).find(a => a.id === achId);
       if (achievement) {
-        printToTerminal(`- ${achievement.name}`, "info");
+        const rankText = achData.currentRank === achievement.ranks.length ? "MAX" : achData.currentRank;
+        achievementsHTML += `
+          <div class="profile-achievement-item">
+            <span class="achievement-name">${achievement.name}</span>
+            <span class="achievement-rank">Rank ${rankText}</span>
+          </div>`;
       }
-    });
+    }
+    achievementsHTML += '</div>';
   }
 
-  printToTerminal("\nProfile Commands:", "system");
-  printToTerminal("!setname <name> - Set your hunter name", "info");
-  printToTerminal("!settitle <title> - Set your title", "info");
-  printToTerminal("!setbio <text> - Set your profile bio", "info");
-  printToTerminal("!setclass <class> - Set your hunter class", "info");
+  // Generate profile HTML
+  const profileContent = document.getElementById("profileContent");
+  profileContent.innerHTML = `
+    <div class="window-section">
+      <div class="profile-header">
+        <img src="${player.profile.picture}" alt="Profile Picture" class="profile-picture">
+        <div class="profile-title" style="color: ${player.profile.titleColor || 'white'}">
+          [${player.profile.title || "Novice"}] ${player.profile.name || "Unnamed Hunter"}
+        </div>
+      </div>
+      <div class="profile-details">
+        <div>Class: ${player.profile.class || "Hunter"}</div>
+        <div>Rank: ${player.rank}</div>
+        <div>Level: ${player.level}</div>
+        <div>EXP: ${player.exp}/${getExpNeededForLevel(player.level)}</div>
+        <div>Gold: ${player.gold}</div>
+        <div>Daily Streak: ${player.streak} days</div>
+        ${player.waterIntake?.streakDays > 0 ? `<div>Water Streak: ${player.waterIntake.streakDays} days</div>` : ''}
+        <div>Quests Completed: ${player.questsCompleted}</div>
+        <div>Bio: ${player.profile.bio || "No bio set"}</div>
+        <div>Join Date: ${player.profile.joinDate?.toDate().toLocaleDateString() || "Unknown"}</div>
+      </div>
+      <div class="profile-achievements">
+        <h3>Achievements:</h3>
+        ${achievementsHTML}
+      </div>
+      <div class="profile-commands">
+        <h3>Profile Commands:</h3>
+        <div>!setname &lt;name&gt; - Set your hunter name</div>
+        <div>!settitle &lt;title&gt; - Set your title</div>
+        <div>!setbio &lt;text&gt; - Set your profile bio</div>
+        <div>!setclass &lt;class&gt; - Set your hunter class</div>
+      </div>
+    </div>
+  `;
+
+  // Show the profile window
+  windowSystem.showWindow("profileWindow");
+
+  // Also print basic info to terminal for quick reference
+  printToTerminal("\n=== PLAYER PROFILE ===", "system");
+  printToTerminal(`[${player.profile.title || "Novice"}] ${player.profile.name || "Unnamed Hunter"}`, "info");
+  printToTerminal(`Rank: ${player.rank} | Level: ${player.level} | Streak: ${player.streak} days`, "info");
+  printToTerminal("Use !profile to view full details in window", "system");
 }

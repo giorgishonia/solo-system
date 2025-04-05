@@ -1,7 +1,7 @@
 
 
 
-const ITEMS = {
+const ITEMS_DATA = {
     // 🎓 XP & Level Boosters
     MINOR_XP_BOOST: {
       id: "minor_xp_boost",
@@ -95,15 +95,28 @@ const ITEMS = {
       rankRequired: "E",
       effect: { type: "name_color", value: true },
     },
-    PROFILE_SHOWCASE: {
-      id: "profile_showcase",
-      name: "Profile Showcase",
-      description: "Unlocks custom profile layout and background themes",
-      price: 800,
-      category: "cosmetic",
-      rankRequired: "D",
-      effect: { type: "profile_custom", value: true },
+
+    NAME_CHANGE_TOKEN: {
+      id: "name_change_token",
+      name: "Name Change Token",
+      description: "Allows you to change your hunter name once",
+      price: 500,
+      category: "utility",
+      rankRequired: "E",
+      consumable: true,
+      effect: { type: "name_change", value: 1 }
     },
+    TITLE_CHANGE_TOKEN: {
+      id: "title_change_token",
+      name: "Title Change Token",
+      description: "Allows you to change your title once",
+      price: 750,
+      category: "utility",  // <-- This category is not in your mapping
+      rankRequired: "E",
+      consumable: true,
+      effect: { type: "title_change", value: 1 }
+    },
+
     LEVEL_EFFECT: {
       id: "level_effect",
       name: "Level-Up Effect",
@@ -177,59 +190,12 @@ const ITEMS = {
       id: "daily_quest_reset",
       name: "Daily Quest Reset",
       description: "Reset all daily quests immediately",
-      price: 750,
+      price: 500,
       category: "special",
       rankRequired: "B",
       effect: { type: "reset_daily", value: true },
     },
-    DEMON_KINGS_SOUL: {
-      id: "demon_kings_soul",
-      name: "Demon King's Soul",
-      description: "Grants immense power for 5 minutes",
-      price: 5000,
-      category: "special",
-      rankRequired: "A",
-      duration: 300000, // 5 minutes
-      effect: { type: "all_stats", value: 5.0 },
-    },
   
-    // 🆕 New Features
-    QUEST_CHAIN: {
-      id: "quest_chain",
-      name: "Quest Chain",
-      description: "Unlock chain quests that give increasing rewards for consecutive completion",
-      price: 1500,
-      category: "special",
-      rankRequired: "C",
-      effect: { type: "quest_chain", value: true },
-    },
-    ACHIEVEMENT_TRACKER: {
-      id: "achievement_tracker",
-      name: "Achievement Tracker",
-      description: "Shows hidden achievements and tracks progress in real-time",
-      price: 1000,
-      category: "special",
-      rankRequired: "D",
-      effect: { type: "achievement_tracking", value: true },
-    },
-    CUSTOM_MILESTONES: {
-      id: "custom_milestones",
-      name: "Custom Milestones",
-      description: "Create and track personal milestones with custom rewards",
-      price: 2000,
-      category: "special",
-      rankRequired: "C",
-      effect: { type: "milestone_custom", value: true },
-    },
-    SHADOW_ARMY_DISPLAY: {
-      id: "shadow_army_display",
-      name: "Shadow Army Display",
-      description: "Shows your shadow army progress and achievements on profile",
-      price: 1500,
-      category: "cosmetic",
-      rankRequired: "B",
-      effect: { type: "army_display", value: true },
-    },
     RANK_INSIGNIA: {
       id: "rank_insignia",
       name: "Rank Insignia",
@@ -239,80 +205,12 @@ const ITEMS = {
       rankRequired: "C",
       effect: { type: "rank_badge", value: true },
     },
-    DUNGEON_LOG: {
-      id: "dungeon_log",
-      name: "Dungeon Log",
-      description: "Tracks and displays your dungeon clear history and statistics",
-      price: 800,
-      category: "special",
-      rankRequired: "D",
-      effect: { type: "dungeon_history", value: true },
-    },
-  
-    // 🖤 Shadow Abilities
-    SHADOW_EXTRACTION: {
-      id: "shadow_extraction",
-      name: "Shadow Extraction",
-      description: "Unlocks the ability to extract shadows from defeated bosses",
-      price: 3000,
-      category: "shadow",
-      rankRequired: "A",
-      effect: { type: "shadow_ability", value: "extraction" }
-    },
-    SHADOW_STORAGE_1: {
-      id: "shadow_storage_1",
-      name: "Shadow Storage I",
-      description: "Increases maximum shadow soldier capacity by 10",
-      price: 1000,
-      category: "shadow",
-      rankRequired: "B",
-      effect: { type: "max_shadows", value: 10 }
-    },
-    SHADOW_STORAGE_2: {
-      id: "shadow_storage_2",
-      name: "Shadow Storage II",
-      description: "Increases maximum shadow soldier capacity by 25",
-      price: 2500,
-      category: "shadow",
-      rankRequired: "A",
-      effect: { type: "max_shadows", value: 25 }
-    },
-    SHADOW_STORAGE_3: {
-      id: "shadow_storage_3",
-      name: "Shadow Storage III",
-      description: "Increases maximum shadow soldier capacity by 50",
-      price: 5000,
-      category: "shadow",
-      rankRequired: "S",
-      effect: { type: "max_shadows", value: 50 }
-    },
-    ELITE_SHADOW_UPGRADE: {
-      id: "elite_shadow_upgrade",
-      name: "Elite Shadow Upgrade",
-      description: "Unlocks the ability to create Elite Shadow Soldiers",
-      price: 4000,
-      category: "shadow",
-      rankRequired: "A",
-      effect: { type: "shadow_tier", value: "elite" }
-    },
-    GENERAL_SHADOW_UPGRADE: {
-      id: "general_shadow_upgrade",
-      name: "General Shadow Upgrade",
-      description: "Unlocks the ability to create Shadow Generals",
-      price: 6000,
-      category: "shadow",
-      rankRequired: "S",
-      effect: { type: "shadow_tier", value: "general" }
-    },
-    MONARCH_SHADOW_UPGRADE: {
-      id: "monarch_shadow_upgrade",
-      name: "Monarch Shadow Upgrade",
-      description: "Unlocks the ability to create Shadow Monarchs",
-      price: 10000,
-      category: "shadow",
-      rankRequired: "S",
-      effect: { type: "shadow_tier", value: "monarch" }
-    },
   };
 
-  export default ITEMS;
+// Create a new object using item.id as keys
+const ITEMS = {};
+Object.values(ITEMS_DATA).forEach(item => {
+  ITEMS[item.id] = item;
+});
+
+export default ITEMS;

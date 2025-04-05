@@ -3,14 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Solo Leveling</title>
+    <title>SOLO</title>
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
     />
+    <link rel="icon" href="favicon.ico" type="image/x-icon" />
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="src/style.css" />
   </head>
   <body>
@@ -61,7 +63,7 @@
       </div>
     </div>   
     <!-- Update terminal HTML structure -->
-    <button id="toggleTerminal"><i class="fa-solid fa-terminal"></i></button>
+    <button class="taskbar-item" id="toggleTerminal"><i class="fa-solid fa-terminal"></i></button>
     <div class="terminal-container" id="terminal">
       <div class="terminal-output" id="output"></div>
       <div class="input-container">
@@ -75,6 +77,7 @@
           class="terminal-input"
           id="input"
           autofocus
+          placeholder="Enter your command..."
         />
       </div>
     </div>
@@ -86,10 +89,33 @@
     <div class="status-bar">
       <span>RANK: E</span>
       <span>LEVEL: 1</span>
-      <span>EXP: 0/159</span>
+      <span>EXP: 0/100</span>
       <span>GOLD: 0</span>
     </div>
-
+    <div id="statsWindow" class="window" style="z-index: 10000;">
+      <div class="window-header">
+        <span>Daily Quest Statistics</span>
+        <div class="window-controls">
+          <button class="window-minimize">-</button>
+          <button class="window-close">×</button>
+        </div>      </div>
+      <div class="window-content">
+        <div id="statsContent">
+          <div class="stats-section">
+            <h3>Completion Rate</h3>
+            <canvas id="completionChart" width="400" height="200"></canvas>
+          </div>
+          <div class="stats-section">
+            <h3>Progress by Day</h3>
+            <canvas id="progressChart" width="400" height="200"></canvas>
+          </div>
+          <div class="stats-section">
+            <h3>Activity Breakdown</h3>
+            <canvas id="activityChart" width="400" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
     <!-- Notifications Window -->
     <div id="notificationsWindow" class="window">
       <div class="window-header">
@@ -115,8 +141,11 @@
       </div>
       <div class="window-content">
         <div class="window-section">
-          <div class="window-section-title">Character Info</div>
-          <div class="window-grid">
+          <div class="sl-system-header">
+            <div class="sl-system-line"></div>
+            <div class="sl-title">PLAYER INFO</div>
+            <div class="sl-system-line"></div>
+          </div>          <div class="window-grid">
             <div class="window-item">
               <div class="window-item-title">Name</div>
               <div class="window-item-description" id="profileName">
@@ -142,8 +171,11 @@
           </div>
         </div>
         <div class="window-section">
-          <div class="window-section-title">Stats</div>
-          <div class="window-grid">
+          <div class="sl-system-header">
+            <div class="sl-system-line"></div>
+            <div class="sl-title">PLAYER STATS</div>
+            <div class="sl-system-line"></div>
+          </div>          <div class="window-grid">
             <div class="window-item">
               <div class="window-item-title">Rank</div>
               <div class="window-item-description" id="profileRank">E</div>
@@ -170,8 +202,11 @@
           </div>
         </div>
         <div class="window-section">
-          <div class="window-section-title">Progress</div>
-          <div class="window-grid">
+          <div class="sl-system-header">
+            <div class="sl-system-line"></div>
+            <div class="sl-title">PLAYER PROGRESS</div>
+            <div class="sl-system-line"></div>
+          </div>          <div class="window-grid">
             <div class="window-item">
               <div class="window-item-title">Quests Completed</div>
               <div class="window-item-description" id="profileQuestsCompleted">
@@ -208,30 +243,137 @@
             </div>
           </div>
         </div>
+        
+        <!-- Physical Stats Section -->
+        <div class="window-section">
+          <div class="sl-system-header">
+            <div class="sl-system-line"></div>
+            <div class="sl-title">PHYSICAL STATS</div>
+            <div class="sl-system-line"></div>
+          </div>          <div class="window-grid">
+            <div class="window-item">
+              <div class="window-item-title">Age</div>
+              <div class="window-item-description" id="profileAge">
+                Not set
+              </div>
+            </div>
+            <div class="window-item">
+              <div class="window-item-title">Height</div>
+              <div class="window-item-description" id="profileHeight">
+                Not set
+              </div>
+            </div>
+            <div class="window-item">
+              <div class="window-item-title">Weight</div>
+              <div class="window-item-description" id="profileWeight">
+                Not set
+              </div>
+            </div>
+            <div style="border-bottom-left-radius: 0px; border-bottom-right-radius: 0px;" class="window-item">
+              <div class="window-item-title">Gender</div>
+              <div class="window-item-description" id="profileGender">
+                Not set
+              </div>
+            </div>
+          </div>
+        </div>
+        
         <div style="justify-content: center" class="window-actions">
-          <button
-            style="display: none"
-            class="window-button"
-            onclick="showSetNamePrompt()"
-          >
-            Set Name
-          </button>
-          <button
-            style="display: none"
-            class="window-button"
-            onclick="showSetTitlePrompt()"
-          >
-            Set Title
-          </button>
-          <button class="window-button" onclick="showSetClassPrompt()">
-            Set Class
-          </button>
-          <button class="window-button" onclick="showSetBioPrompt()">
-            Set Bio
-          </button>
+          <button class="window-button" onclick="window.showSetProfilePrompt()">Edit Profile</button>
+          <button class="window-button" onclick="showSetPhysicalProfilePrompt()">Set Physical Profile</button>
         </div>
       </div>
     </div>
+<!-- Add this somewhere in your HTML file, likely where your other windows are defined -->
+<div id="setPhysicalProfileWindow" class="window" style="width: 400px;">
+  <div class="window-header">
+    <div class="window-title">Physical Profile</div>
+    <div class="window-controls">
+      <button class="window-close" onclick="windowSystem.closeWindow('setPhysicalProfileWindow')">×</button>
+    </div>
+  </div>
+  <div id="setPhysicalProfileContent" class="window-content"></div>
+</div>
+    <!-- Set Name Window -->
+<div id="setNameWindow" class="window">
+  <div class="window-header">
+    <div class="window-title">Set Name</div>
+    <button class="window-close">×</button>
+  </div>
+  <div id="setNameContent" class="window-content"></div>
+</div>
+
+<!-- Set Title Window -->
+<div id="setTitleWindow" class="window">
+  <div class="window-header">
+    <div class="window-title">Set Title</div>
+    <button class="window-close">×</button>
+  </div>
+  <div id="setTitleContent" class="window-content"></div>
+</div>
+
+<!-- Set Bio Window -->
+<div id="setBioWindow" class="window">
+  <div class="window-header">
+    <div class="window-title">Set Bio</div>
+    <button class="window-close">×</button>
+  </div>
+  <div id="setBioContent" class="window-content"></div>
+</div>
+
+<!-- Set Profile Window (combines name, title, class, and bio) -->
+<div id="setProfileWindow" class="window">
+  <div class="window-header">
+    <div class="window-title">Profile Settings</div>
+    <button class="window-close" onclick="window.windowSystem.closeWindow('setProfileWindow')">×</button>
+  </div>
+  <div id="setProfileContent" class="window-content"></div>
+</div>
+
+<!-- Set Class Window -->
+<div id="setClassWindow" class="window">
+  <div class="window-header">
+    <div class="window-title">Set Class</div>
+    <button class="window-close">×</button>
+  </div>
+  <div id="setClassContent" class="window-content"></div>
+</div>
+
+<!-- Set Height Window -->
+<div id="setHeightWindow" class="window">
+  <div class="window-header">
+    <div class="window-title">Set Height</div>
+    <button class="window-close">×</button>
+  </div>
+  <div id="setHeightContent" class="window-content"></div>
+</div>
+
+<!-- Set Weight Window -->
+<div id="setWeightWindow" class="window">
+  <div class="window-header">
+    <div class="window-title">Set Weight</div>
+    <button class="window-close">×</button>
+  </div>
+  <div id="setWeightContent" class="window-content"></div>
+</div>
+
+<!-- Set Gender Window -->
+<div id="setGenderWindow" class="window">
+  <div class="window-header">
+    <div class="window-title">Set Gender</div>
+    <button class="window-close">×</button>
+  </div>
+  <div id="setGenderContent" class="window-content"></div>
+</div>
+
+<!-- Set Physique Window -->
+<div id="setPhysiqueWindow" class="window">
+  <div class="window-header">
+    <div class="window-title">Set Physique Stats</div>
+    <button class="window-close">×</button>
+  </div>
+  <div id="setPhysiqueContent" class="window-content"></div>
+</div>
 
     <!-- Quests Window -->
     <div class="window" id="questsWindow">
@@ -244,8 +386,11 @@
       </div>
       <div class="window-content">
         <div class="window-section">
-          <div class="window-section-title">Current Quests</div>
-          <div class="window-grid" id="activeQuestsList">
+          <div class="sl-system-header">
+            <div class="sl-system-line"></div>
+            <div class="sl-title">ACTIVE QUESTS</div>
+            <div class="sl-system-line"></div>
+          </div>          <div class="window-grid" id="activeQuestsList">
             <!-- Quests will be dynamically added here -->
           </div>
         </div>
@@ -257,18 +402,26 @@
       </div>
     </div>
 
-    <!-- Daily Quests Window -->
-    <div class="window" id="dailyQuestsWindow">
-      <div class="window-header">
-        <div class="window-title">Daily Quests</div>
-        <div class="window-controls">
-          <button class="window-minimize">-</button>
-          <button class="window-close">×</button>
-        </div>
-      </div>
-      <div class="window-content">
+ <!-- Daily Quests Window -->
+<div class="window" id="dailyQuestsWindow">
+  <div class="window-header">
+    <div class="window-title">Daily Dashboard</div>
+    <div class="window-controls">
+      <button class="window-minimize">-</button>
+      <button class="window-close">×</button>
+    </div>
+  </div>
+  <div class="window-content">
+    <!-- Tab Navigation -->
+    <div class="tab-navigation" style="display: flex; gap: 10px;">
+      <button style="width: 100%;" id="daily-quests-tab" class="window-button">Daily Quests</button>
+      <button style="width: 100%;" id="water-intake-tab" class="window-button">Water Intake</button>
+    </div>
+    <!-- Content Sections -->
+    <div class="tab-content-wrapper">
+      <!-- Daily Quests Section -->
+      <div id="daily-quests-content" class="tab-content" style="display: block;">
         <div class="window-section">
-          <div class="window-section-title">Today's Quests</div>
           <div class="window-grid" id="dailyQuestsList">
             <!-- Daily quests will be dynamically added here -->
           </div>
@@ -279,9 +432,70 @@
           </button>
         </div>
       </div>
+      <!-- Water Intake Section -->
+      <div id="water-intake-content" class="tab-content" style="display: none;">
+        <div class="window-section">
+          <div class="sl-system-header">
+            <div class="sl-system-line"></div>
+            <div class="sl-title">WATER INTAKE</div>
+            <div class="sl-system-line"></div>
+          </div>
+          <div id="water-intake-details">
+            <!-- This will be populated by JavaScript -->
+          </div>
+        </div>
+      </div>
     </div>
+  </div>
 
-    <!-- Achievements Window -->
+  <!-- Edit Goal Popup -->
+  <div id="edit-goal-popup" class="popup-overlay">
+    <div class="popup-content">
+      <h3>Edit Daily Goal</h3>
+      <div class="popup-form">
+        <label for="edit-daily-goal">Daily Goal (Liters):</label>
+        <input type="number" id="edit-daily-goal" min="0.1" step="0.1" value="2">
+      </div>
+      <div class="popup-actions">
+        <button class="window-button" onclick="saveEditedGoal()">Save</button>
+        <button class="window-button cancel-btn" onclick="closePopup('edit-goal-popup')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Cup Popup -->
+  <div id="edit-cup-popup" class="popup-overlay">
+    <div class="popup-content">
+      <h3>Edit Cup Size</h3>
+      <div class="popup-form">
+        <label for="edit-cup-size">Cup Size (ml):</label>
+        <input type="number" id="edit-cup-size" min="50" step="10" value="250">
+      </div>
+      <div class="popup-actions">
+        <button class="window-button" onclick="saveEditedCup()">Save</button>
+        <button class="window-button cancel-btn" onclick="closePopup('edit-cup-popup')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Cup Popup -->
+  <div id="add-cup-popup" class="popup-overlay">
+    <div class="popup-content">
+      <h3>Add Water</h3>
+      <div class="popup-form">
+        <label for="add-water-amount">Amount (ml):</label>
+        <input type="number" id="add-water-amount" min="10" step="10" value="250">
+      </div>
+      <div class="popup-actions">
+        <button class="popup-btn save-btn" onclick="addCustomWaterAmount()">Add</button>
+        <button class="popup-btn cancel-btn" onclick="closePopup('add-cup-popup')">Cancel</button>
+      </div>
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+
     <div class="window" id="achievementsWindow">
       <div class="window-header">
         <div class="window-title">Achievements</div>
@@ -292,7 +506,6 @@
       </div>
       <div class="window-content">
         <div class="window-section">
-          <div class="window-section-title">Unlocked Achievements</div>
           <div class="window-grid" id="achievementsList">
             <!-- Achievements will be dynamically added here -->
           </div>
@@ -311,8 +524,11 @@
       </div>
       <div class="window-content">
         <div class="window-section">
-          <div class="window-section-title">Available Items</div>
-          <div class="window-grid" id="shopItemsList">
+          <div class="sl-system-header">
+            <div class="sl-system-line"></div>
+            <div class="sl-title">AVAILABLE ITEMS</div>
+            <div class="sl-system-line"></div>
+          </div>          <div class="window-grid" id="shopItemsList">
             <!-- Shop items will be dynamically added here -->
           </div>
         </div>
@@ -330,7 +546,11 @@
       </div>
       <div class="window-content">
         <div class="window-section">
-          <div class="window-section-title">Your Items</div>
+          <div class="sl-system-header">
+            <div class="sl-system-line"></div>
+            <div class="sl-title">YOUR ITEMS</div>
+            <div class="sl-system-line"></div>
+          </div>
           <div class="window-grid" id="inventoryItemsList">
             <!-- Inventory items will be dynamically added here -->
           </div>
@@ -367,11 +587,6 @@
         </div>
       </div>
       <div class="window-content">
-        <div class="window-section">
-          <div class="window-section-title">Top Players</div>
-          <div class="window-grid" id="leaderboardList">
-            <!-- Leaderboard entries will be dynamically added here -->
-          </div>
         </div>
       </div>
     </div>
@@ -395,6 +610,40 @@
       </div>
     </div>
 
+    <!-- Notes Window -->
+    <div id="notesWindow" class="window">
+      <div class="window-header">
+        <div class="window-title">Notes</div>
+        <button class="window-close">×</button>
+      </div>
+      <div class="window-content">
+        <div class="notes-toolbar">
+          <button class="window-button" onclick="noteManager.createNote()">
+            <i class="fas fa-plus"></i> New Note
+          </button>
+        </div>
+        <div id="notesList" class="notes-list">
+          <!-- Notes will be populated here -->
+        </div>
+      </div>
+    </div>
+
+    <div id="taskSuggestionWindow" class="window">
+      <div class="window-header">
+        <span>Suggested Task</span>
+        <button class="window-close">×</button>
+      </div>
+      <div class="window-content">
+        <p><strong>Title:</strong> <span id="suggestedTitle"></span></p>
+        <p><strong>Description:</strong> <span id="suggestedDescription"></span></p>
+        <p><strong>Target:</strong> <span id="suggestedTarget"></span> <span id="suggestedMetric"></span></p>
+      </div>
+      <div class="window-actions">
+        <button id="acceptTask" class="window-button">Accept</button>
+        <button id="declineTask" class="window-button">Decline</button>
+      </div>
+    </div>
+
     <!-- Rank Progress Window -->
     <div class="window" id="rankProgressWindow">
       <div class="window-header">
@@ -406,7 +655,6 @@
       </div>
       <div class="window-content">
         <div class="window-section">
-          <div class="window-section-title">Current Progress</div>
           <div class="window-grid" id="rankProgressContent">
             <!-- Rank progress content will be dynamically added here -->
           </div>
@@ -437,8 +685,17 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
-    <script type="module" src="src/script.js"></script>    
+    <!-- Make sure Firebase is initialized before our modules -->
+    <script>
+      // Check if Firebase is initialized
+      if (typeof firebase === 'undefined') {
+        console.error('Firebase is not loaded properly');
+      } else {
+        window.firebaseInitialized = true;
+      }
+    </script>
+    <script type="module" src="src/script.js"></script>
+    <script type="module" src="./src/items.js"></script>
+    <script src="src/profile-functions.js"></script>   
   </body>
 </html>
-
-
