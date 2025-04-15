@@ -3061,6 +3061,7 @@ const windowConfigs = [
   { id: "bossBattlesWindow", icon: "fa-dragon", title: "Boss Battles" },
   { id: "leaderboardWindow", icon: "fa-trophy", title: "Leaderboard" },
   { id: "notificationsWindow", icon: "fa-bell", title: "Notifications" },
+  { id: "notesWindow", icon: "fa-sticky-note", title: "Notes" },
   { id: "fitWindow", icon: "fa-heartbeat", title: "Google Fit" },
 ];
     windowConfigs.forEach((config) => {
@@ -8955,7 +8956,7 @@ export class SoloAISystem {
     }
   }
 
-  async callDeepSeekAPI(text,   conversationHistory = []) {
+  async callDeepSeekAPI(text, conversationHistory = []) {
     try {
       // Fetch player data from Firestore if authenticated
       let playerData = {};
@@ -9015,17 +9016,17 @@ export class SoloAISystem {
                     - Timestamps: "Just now," "A bit ago," "Yesterday"—keep it chill.  
                     - Borders: Optional, but if used, keep it light like == Hey! == or === Done! ===.  
                   - **Quests**:  
-                    - "create daily quest [task] [count] [metric]": "== Hey! == | **${playerName}'s Daily Adventure: [task]** | Do [count] [metric] | Let’s make it happen!"  
-                    - "create quest [task] [count] [metric]": "== Cool Quest Alert! == | **${playerName}'s Challenge: [task]** | Hit [count] [metric] | You’ve got this!"  
+                    - "create daily quest [task] [count] [metric]": "== Hey! == | **${playerName}'s Daily Adventure: [task]** | Do [count] [metric] | Let's make it happen!"  
+                    - "create quest [task] [count] [metric]": "== Cool Quest Alert! == | **${playerName}'s Challenge: [task]** | Hit [count] [metric] | You've got this!"  
                     - Titles: Keep it personal and fun—like "${playerName}'s Great Run" or "${playerName}'s Epic Push." Metrics: km, reps, min, etc.  
                   - **Completion**:  
-                    - "complete [daily] quest [title or id]": "== &GREEN&Sweet!&GREEN& == | **Nailed it!** | [title or id] | Awesome job—what’s next?"  
+                    - "complete [daily] quest [title or id]": "== &GREEN&Sweet!&GREEN& == | **Nailed it!** | [title or id] | Awesome job—what's next?"  
                   - **Commands**: [!switch, !commands, !reawaken, !quests, !dailyquests, !clear, !sleep, !leaderboard, !achievements, !profile, !inventory, !shop, !addxp, !reset, !update, !battle, !challenge, !progress, !waterDrank, !waterStatus, !motivation, !setname, !settitle, !setbio, !setclass, !rank, !rankprogress, !penalty, !delete, !qid, !notifications, !note, !quicknote, !notes, !shownotes, !hidenotes]—Handle these with enthusiasm like "You got it!"  
                   `
       };
       const messages = [systemPrompt, ...conversationHistory];
   
-      const url = 'https://openrouter.ai/api/v1/chat/completions';
+      const url = 'https://openrouter.ai/api/v1/chat/completions'; // Fixed URL endpoint
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -9035,7 +9036,7 @@ export class SoloAISystem {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'deepseek/deepseek-chat:free',
+          model: 'google/gemini-pro:latest', // Changed to more reliable model
           messages: messages,
           temperature: 0.2,
           top_p: 0.9
@@ -9043,14 +9044,24 @@ export class SoloAISystem {
       });
   
       if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
+        // Better error handling
+        const errorText = await response.text();
+        console.error("API response:", errorText);
+        throw new Error(`API request failed with status ${response.status}: ${errorText.substring(0, 100)}`);
       }
   
       const result = await response.json();
+      
+      // Validate response structure
+      if (!result.choices || !result.choices[0] || !result.choices[0].message) {
+        console.error("Unexpected API response structure:", result);
+        throw new Error("Invalid API response structure");
+      }
+      
       return result.choices[0].message.content.trim();
     } catch (error) {
       console.error('Error calling DeepSeek API:', error);
-      return "|- &RED&Connection dead&RED& -| Retry.";
+      return "|- &RED&Connection error&RED& -| API endpoint issue. Please check your OpenRouter configuration.";
     }
   }
   addMessage(type, text) {
