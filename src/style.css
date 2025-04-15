@@ -1344,7 +1344,8 @@ body {
 @media screen and (max-width: 768px) {
   .terminal-container {
     padding: 10px;
-    height: 100vh;
+    height: 92.8vh;
+    overflow-x: hidden;
   }
 
   .input-container {
