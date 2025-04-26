@@ -4230,7 +4230,6 @@ async updateProfileWindow() {
             background: rgba(0, 30, 60, 0.3);
             border-left: 3px solid rgba(0, 160, 255, 0.5);
             border-radius: 0 3px 3px 0;
-            overflow: hidden;
             transition: all 0.3s ease;
           }
           
